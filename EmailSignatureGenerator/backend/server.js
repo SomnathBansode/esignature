@@ -8,6 +8,7 @@ import { checkConnection } from "./config/db.js";
 import pool from "./config/db.js"; // add this import if not present
 import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import { transporter } from "./utils/mailer.js"; // Impo
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 // --- CORS setup ---
@@ -41,6 +42,20 @@ app.get("/ready", async (_req, res) => {
   const ok = await checkConnection();
   if (ok) return res.status(200).json({ db: "connected" });
   return res.status(503).json({ db: "error" });
+});
+// In server.js, add under other routes
+app.get("/test-smtp", async (_req, res) => {
+  try {
+    await transporter.verify();
+    res.json({ status: "SMTP OK" });
+  } catch (error) {
+    console.error("SMTP Verify Error:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+    res.status(500).json({ error: error.message });
+  }
 });
 app.use("/api/auth", authRoutes);
 app.use("/api/templates", templateRoutes);
