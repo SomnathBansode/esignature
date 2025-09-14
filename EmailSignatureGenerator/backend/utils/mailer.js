@@ -12,7 +12,6 @@ const transporter = nodemailer.createTransport({
 // Function to send emails
 export const sendEmail = async (to, subject, text, html) => {
   try {
-    console.log(`Attempting to send email to: ${to}`);
     await transporter.sendMail({
       from: process.env.EMAIL_USER, // sender address
       to, // recipient address
