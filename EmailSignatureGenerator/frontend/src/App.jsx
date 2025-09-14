@@ -1,93 +1,95 @@
-// frontend/src/App.jsx
+import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
-import Nav from "./components/Nav";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import CreateSignature from "./pages/CreateSignature";
-import EditSignature from "./pages/EditSignature";
-import MySignatures from "./pages/MySignatures";
-import BrowseTemplates from "./pages/BrowseTemplates";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import ManageTemplates from "./pages/admin/ManageTemplates";
-import ManageUsers from "./pages/admin/ManageUsers";
-import ProtectedRoute from "./ProtectedRoute"; // Custom Protected Route for authenticated users
-import Register from "./pages/Register";
+import { useDispatch } from "react-redux";
+import { fetchProfile } from "./redux/slices/userSlice";
+
+import Navbar from "./components/Navbar.jsx";
+import PrivateRoute from "./components/PrivateRoute.jsx";
+import PublicRoute from "./components/PublicRoute.jsx";
+
+import HomePage from "./pages/HomePage.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import Dashboard from "./pages/user/Dashboard.jsx";
+import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
+import NotFound from "./pages/NotFound.jsx";
+import SignatureListPage from "./pages/SignatureListPage.jsx";
 function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) dispatch(fetchProfile());
+  }, [dispatch]);
+
   return (
     <>
-      <Nav />
+      <Navbar />
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} /> {/* Register Page */}
-        {/* User Routes */}
+        <Route path="/" element={<HomePage />} />
+
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoute>
+              <ForgotPasswordPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <PublicRoute>
+              <ResetPasswordPage />
+            </PublicRoute>
+          }
+        />
+
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <PrivateRoute>
               <Dashboard />
-            </ProtectedRoute>
+            </PrivateRoute>
           }
         />
-        <Route
-          path="/browse-templates"
-          element={
-            <ProtectedRoute>
-              <BrowseTemplates />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/create-signature"
-          element={
-            <ProtectedRoute>
-              <CreateSignature />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/edit-signature/:id"
-          element={
-            <ProtectedRoute>
-              <EditSignature />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-signatures"
-          element={
-            <ProtectedRoute>
-              <MySignatures />
-            </ProtectedRoute>
-          }
-        />
-        {/* Admin Routes */}
+
         <Route
           path="/admin/dashboard"
           element={
-            <ProtectedRoute role="admin">
+            <PrivateRoute adminOnly={true}>
               <AdminDashboard />
-            </ProtectedRoute>
+            </PrivateRoute>
           }
         />
         <Route
-          path="/admin/manage-templates"
+          path="/signatures"
           element={
-            <ProtectedRoute role="admin">
-              <ManageTemplates />
-            </ProtectedRoute>
+            <PrivateRoute>
+              <SignatureListPage />
+            </PrivateRoute>
           }
         />
-        <Route
-          path="/admin/manage-users"
-          element={
-            <ProtectedRoute role="admin">
-              <ManageUsers />
-            </ProtectedRoute>
-          }
-        />
+
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
