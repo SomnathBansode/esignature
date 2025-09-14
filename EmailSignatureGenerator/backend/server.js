@@ -10,7 +10,24 @@ import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 const app = express();
 app.use(express.json({ limit: "2mb" }));
-app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
+// --- CORS setup ---
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN, // Netlify frontend (production)
+  "http://localhost:5173", // Vite local dev
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 // Health check route (API + DB)
 app.get("/health", async (_req, res) => {

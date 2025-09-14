@@ -1,0 +1,5 @@
+# Redirect all frontend routes to index.html (React Router support)
+/*    /index.html   200
+
+# Proxy API requests to backend
+/api/*   https://your-backend-service.onrender.com/:splat   200
