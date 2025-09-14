@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 
 // Create a reusable transporter object using the default SMTP transport
 const transporter = nodemailer.createTransport({
-  service: "gmail", // You can use 'gmail' or other email service
+  service: "Gmail", // You can use 'gmail' or other email service
   auth: {
     user: process.env.EMAIL_USER, // Your Gmail email
     pass: process.env.EMAIL_PASS, // Your App-Specific Password or normal password
