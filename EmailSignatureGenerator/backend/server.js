@@ -6,7 +6,8 @@ import templateRoutes from "./routes/templateRoutes.js";
 import signatureRoutes from "./routes/signatureRoutes.js";
 import { checkConnection } from "./config/db.js";
 import pool from "./config/db.js"; // add this import if not present
-
+import adminRoutes from "./routes/adminRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
@@ -27,7 +28,8 @@ app.get("/ready", async (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/signatures", signatureRoutes);
-
+app.use("/api/admin", adminRoutes);
+app.use("/api/users", userRoutes);
 // basic error handler
 app.use((err, _req, res, _next) => {
   console.error(err);

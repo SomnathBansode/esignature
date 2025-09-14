@@ -5,19 +5,17 @@ import { resetPassword, clearMessages } from "../redux/slices/userSlice";
 import { useNavigate, useLocation } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { ClipLoader } from "react-spinners";
+import toast from "react-hot-toast";
 import gsap from "gsap";
 
 const ResetPasswordPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, error, successMessage } = useSelector(
-    (state) => state.user
-  );
+  const { user, loading } = useSelector((state) => state.user);
   const [showPassword, setShowPassword] = React.useState(false);
   const [token, setToken] = React.useState("");
   const formRef = useRef(null);
-  const messageRef = useRef(null);
   const animatedRef = useRef(false);
 
   const {
@@ -30,16 +28,24 @@ const ResetPasswordPage = () => {
     dispatch(clearMessages());
     const query = new URLSearchParams(location.search);
     const tokenFromUrl = query.get("token");
-    if (tokenFromUrl) setToken(tokenFromUrl);
-    else {
-      dispatch({
-        type: "user/resetPassword/rejected",
-        payload: "Invalid or missing reset token. Please request a new one.",
+    if (tokenFromUrl) {
+      console.log("Token found:", tokenFromUrl);
+      setToken(tokenFromUrl);
+    } else {
+      console.log("No token found, setting error");
+      toast.error("Invalid or missing reset token. Please request a new one.", {
+        duration: 2000,
       });
+      setTimeout(() => {
+        dispatch(clearMessages());
+        navigate("/forgot-password", { replace: true });
+      }, 2000);
     }
-    if (user) {
-      if (user.role === "admin") navigate("/admin/dashboard");
-      else navigate("/dashboard");
+    if (user && !loading) {
+      console.log("User exists, redirecting:", user);
+      if (user.role === "admin")
+        navigate("/admin/dashboard", { replace: true });
+      else navigate("/dashboard", { replace: true });
     }
 
     if (formRef.current && !animatedRef.current) {
@@ -58,63 +64,37 @@ const ResetPasswordPage = () => {
         }
       );
     }
-
-    if ((successMessage || error) && messageRef.current) {
-      gsap.fromTo(
-        messageRef.current,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          ease: "power2.out",
-          onComplete: () => {
-            gsap.to(messageRef.current, {
-              opacity: 0,
-              duration: 0.5,
-              delay: 1, // Flash for 1 second
-              onComplete: () => {
-                dispatch(clearMessages());
-                if (successMessage) navigate("/login");
-              },
-            });
-          },
-        }
-      );
-    }
-  }, [user, navigate, location, dispatch, successMessage, error]);
+  }, [user, navigate, location, dispatch, loading]);
 
   const onSubmit = async (data) => {
     if (!token) {
-      dispatch({
-        type: "user/resetPassword/rejected",
-        payload: "No reset token provided",
-      });
+      console.log("No token provided, setting error");
+      toast.error("No reset token provided", { duration: 2000 });
       return;
     }
-    await dispatch(resetPassword({ token, newPassword: data.newPassword }));
+    console.log("Submitting reset password with token:", token);
+    try {
+      const promise = dispatch(
+        resetPassword({ token, newPassword: data.newPassword })
+      ).unwrap();
+      await toast.promise(
+        promise,
+        {
+          loading: "Resetting password...",
+          success: "Password reset successfully!",
+          error: (err) => err || "Failed to reset password",
+        },
+        { duration: 2000 }
+      );
+      console.log("Toast completed, redirecting to /login");
+      setTimeout(() => {
+        dispatch(clearMessages());
+        navigate("/login", { replace: true });
+      }, 2000);
+    } catch (err) {
+      console.log("Reset password error:", err);
+    }
   };
-
-  if (!token && error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-100">
-        <div className="max-w-md w-full mx-auto p-8 bg-white rounded-xl shadow-lg border border-gray-200 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-6">
-            Reset Password
-          </h2>
-          <div className="text-red-500 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">
-            {error}
-          </div>
-          <button
-            onClick={() => navigate("/forgot-password")}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-          >
-            Request New Link
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-100">
@@ -126,19 +106,6 @@ const ResetPasswordPage = () => {
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Reset Password
         </h2>
-        {(successMessage || error) && (
-          <div
-            ref={messageRef}
-            className={`text-center mb-4 p-3 rounded-lg border ${
-              successMessage
-                ? "text-green-500 bg-green-50 border-green-200"
-                : "text-red-500 bg-red-50 border-red-200"
-            }`}
-            style={{ opacity: 1 }}
-          >
-            {successMessage || error}
-          </div>
-        )}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="relative">
             <input

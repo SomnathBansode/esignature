@@ -5,17 +5,15 @@ import { register, clearMessages } from "../redux/slices/userSlice";
 import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { ClipLoader } from "react-spinners";
+import toast from "react-hot-toast";
 import gsap from "gsap";
 
 const RegisterPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, loading, error, successMessage } = useSelector(
-    (state) => state.user
-  );
+  const { user, loading } = useSelector((state) => state.user);
   const [showPassword, setShowPassword] = React.useState(false);
   const formRef = useRef(null);
-  const messageRef = useRef(null);
   const animatedRef = useRef(false);
 
   const {
@@ -26,9 +24,11 @@ const RegisterPage = () => {
 
   useEffect(() => {
     dispatch(clearMessages());
-    if (user && !successMessage) {
-      if (user.role === "admin") navigate("/admin/dashboard");
-      else navigate("/dashboard");
+    if (user && !loading) {
+      console.log("User exists, redirecting:", user);
+      if (user.role === "admin")
+        navigate("/admin/dashboard", { replace: true });
+      else navigate("/dashboard", { replace: true });
     }
 
     if (formRef.current && !animatedRef.current) {
@@ -47,37 +47,37 @@ const RegisterPage = () => {
         }
       );
     }
-
-    if (successMessage && messageRef.current) {
-      gsap.fromTo(
-        messageRef.current,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          ease: "power2.out",
-          onComplete: () => {
-            gsap.to(messageRef.current, {
-              opacity: 0,
-              duration: 0.5,
-              delay: 1, // Flash for 1 second
-              onComplete: () => {
-                dispatch(clearMessages());
-                if (user.role === "admin") navigate("/admin/dashboard");
-                else navigate("/dashboard");
-              },
-            });
-          },
-        }
-      );
-    }
-  }, [user, navigate, dispatch, successMessage]);
+  }, [user, navigate, dispatch, loading]);
 
   const onSubmit = async (data) => {
-    await dispatch(
-      register({ name: data.name, email: data.email, password: data.password })
-    );
+    console.log("Submitting register for email:", data.email);
+    try {
+      const promise = dispatch(
+        register({
+          name: data.name,
+          email: data.email,
+          password: data.password,
+        })
+      ).unwrap();
+      await toast.promise(
+        promise,
+        {
+          loading: "Registering...",
+          success: "Registration successful! Welcome!",
+          error: (err) => err || "Registration failed",
+        },
+        { duration: 2000 }
+      );
+      console.log("Toast completed, redirecting to dashboard");
+      setTimeout(() => {
+        dispatch(clearMessages());
+        if (user && user.role === "admin")
+          navigate("/admin/dashboard", { replace: true });
+        else navigate("/dashboard", { replace: true });
+      }, 2000);
+    } catch (err) {
+      console.log("Register error:", err);
+    }
   };
 
   return (
@@ -90,20 +90,6 @@ const RegisterPage = () => {
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Register
         </h2>
-        {error && (
-          <div className="text-red-500 text-center mb-4 bg-red-50 p-3 rounded-lg border border-red-200">
-            {error}
-          </div>
-        )}
-        {successMessage && (
-          <div
-            ref={messageRef}
-            className="text-green-500 text-center mb-4 bg-green-50 p-3 rounded-lg border border-green-200"
-            style={{ opacity: 1 }}
-          >
-            {successMessage}
-          </div>
-        )}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div>
             <input

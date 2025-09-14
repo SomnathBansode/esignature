@@ -53,6 +53,7 @@ export const register = async (req, res, next) => {
 };
 
 // User Login
+// backend/routes/authRoutes.js
 export const login = async (req, res, next) => {
   const { email, password } = req.body;
   try {
@@ -73,7 +74,6 @@ export const login = async (req, res, next) => {
     next(error);
   }
 };
-
 // Forgot Password function
 export const forgotPassword = async (req, res, next) => {
   const { email } = req.body;

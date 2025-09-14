@@ -42,12 +42,14 @@ export const mySignatures = async (req, res, next) => {
 };
 
 // backend/controllers/signatureController.js
+// backend/controllers/signatureController.js
+
 export const adminStats = async (_req, res, next) => {
   try {
     const { rows } = await query(
       "SELECT signature_app.get_admin_stats() as stats"
     );
-    res.json(rows[0].stats); // Sending stats to the frontend
+    res.json(rows[0].stats); // Return the stats object
   } catch (e) {
     next(e);
   }

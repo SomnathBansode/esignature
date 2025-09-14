@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { fetchProfile } from "./redux/slices/userSlice";
+import { Toaster } from "react-hot-toast";
 
 import Navbar from "./components/Navbar.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
@@ -16,6 +17,7 @@ import Dashboard from "./pages/user/Dashboard.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import SignatureListPage from "./pages/SignatureListPage.jsx";
+
 function App() {
   const dispatch = useDispatch();
 
@@ -27,9 +29,36 @@ function App() {
   return (
     <>
       <Navbar />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 2000, // Toasts show for 2 seconds
+          style: {
+            background: "#f7fafc",
+            color: "#1a202c",
+            border: "1px solid #e2e8f0",
+            borderRadius: "8px",
+            padding: "12px",
+            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+          },
+          success: {
+            style: {
+              background: "#f0fff4",
+              color: "#2f855a",
+              border: "1px solid #9ae6b4",
+            },
+          },
+          error: {
+            style: {
+              background: "#fff5f5",
+              color: "#c53030",
+              border: "1px solid #feb2b2",
+            },
+          },
+        }}
+      />
       <Routes>
         <Route path="/" element={<HomePage />} />
-
         <Route
           path="/login"
           element={
@@ -62,7 +91,6 @@ function App() {
             </PublicRoute>
           }
         />
-
         <Route
           path="/dashboard"
           element={
@@ -71,7 +99,6 @@ function App() {
             </PrivateRoute>
           }
         />
-
         <Route
           path="/admin/dashboard"
           element={
@@ -88,7 +115,6 @@ function App() {
             </PrivateRoute>
           }
         />
-
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

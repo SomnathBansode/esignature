@@ -4,16 +4,14 @@ import { useForm } from "react-hook-form";
 import { forgotPassword, clearMessages } from "../redux/slices/userSlice";
 import { useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
+import toast from "react-hot-toast";
 import gsap from "gsap";
 
 const ForgotPasswordPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, loading, error, successMessage } = useSelector(
-    (state) => state.user
-  );
+  const { user, loading } = useSelector((state) => state.user);
   const formRef = useRef(null);
-  const messageRef = useRef(null);
   const animatedRef = useRef(false);
 
   const {
@@ -24,9 +22,11 @@ const ForgotPasswordPage = () => {
 
   useEffect(() => {
     dispatch(clearMessages());
-    if (user) {
-      if (user.role === "admin") navigate("/admin/dashboard");
-      else navigate("/dashboard");
+    if (user && !loading) {
+      console.log("User exists, redirecting:", user);
+      if (user.role === "admin")
+        navigate("/admin/dashboard", { replace: true });
+      else navigate("/dashboard", { replace: true });
     }
 
     if (formRef.current && !animatedRef.current) {
@@ -45,34 +45,29 @@ const ForgotPasswordPage = () => {
         }
       );
     }
-
-    if ((successMessage || error) && messageRef.current) {
-      gsap.fromTo(
-        messageRef.current,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          ease: "power2.out",
-          onComplete: () => {
-            gsap.to(messageRef.current, {
-              opacity: 0,
-              duration: 0.5,
-              delay: 1, // Flash for 1 second
-              onComplete: () => {
-                dispatch(clearMessages());
-                if (successMessage) navigate("/login");
-              },
-            });
-          },
-        }
-      );
-    }
-  }, [user, navigate, dispatch, successMessage, error]);
+  }, [user, navigate, dispatch, loading]);
 
   const onSubmit = async (data) => {
-    await dispatch(forgotPassword({ email: data.email }));
+    console.log("Submitting forgot password for email:", data.email);
+    try {
+      const promise = dispatch(forgotPassword({ email: data.email })).unwrap();
+      await toast.promise(
+        promise,
+        {
+          loading: "Sending reset link...",
+          success: "Password reset link sent to your email!",
+          error: (err) => err || "Failed to send reset link",
+        },
+        { duration: 2000 }
+      );
+      console.log("Toast completed, redirecting to /login");
+      setTimeout(() => {
+        dispatch(clearMessages());
+        navigate("/login", { replace: true });
+      }, 2000);
+    } catch (err) {
+      console.log("Forgot password error:", err);
+    }
   };
 
   return (
@@ -85,19 +80,6 @@ const ForgotPasswordPage = () => {
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Forgot Password
         </h2>
-        {(successMessage || error) && (
-          <div
-            ref={messageRef}
-            className={`text-center mb-4 p-3 rounded-lg border ${
-              successMessage
-                ? "text-green-500 bg-green-50 border-green-200"
-                : "text-red-500 bg-red-50 border-red-200"
-            }`}
-            style={{ opacity: 1 }}
-          >
-            {successMessage || error}
-          </div>
-        )}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div>
             <input
