@@ -1,10 +1,10 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL; // Backend URL
+const API_URL = import.meta.env.VITE_API_URL;
 const tokenFromStorage = localStorage.getItem("token") || null;
 
-// Fetch user profile (used on refresh)
+// Fetch user profile
 export const fetchProfile = createAsyncThunk(
   "user/fetchProfile",
   async (_, { rejectWithValue }) => {
@@ -16,7 +16,7 @@ export const fetchProfile = createAsyncThunk(
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      return res.data; // user object
+      return res.data;
     } catch (err) {
       console.error("fetchProfile error:", err);
       return rejectWithValue(
@@ -126,7 +126,6 @@ const userSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // fetchProfile
       .addCase(fetchProfile.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -143,8 +142,6 @@ const userSlice = createSlice({
         state.loading = false;
         localStorage.removeItem("token");
       })
-
-      // register
       .addCase(register.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -160,8 +157,6 @@ const userSlice = createSlice({
         state.error = action.payload;
         state.loading = false;
       })
-
-      // loginUser
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -177,8 +172,6 @@ const userSlice = createSlice({
         state.error = action.payload;
         state.loading = false;
       })
-
-      // forgotPassword
       .addCase(forgotPassword.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -192,8 +185,6 @@ const userSlice = createSlice({
         state.error = action.payload;
         state.loading = false;
       })
-
-      // resetPassword
       .addCase(resetPassword.pending, (state) => {
         state.loading = true;
         state.error = null;

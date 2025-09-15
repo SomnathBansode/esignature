@@ -17,6 +17,7 @@ import Dashboard from "./pages/user/Dashboard.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import SignatureListPage from "./pages/SignatureListPage.jsx";
+import UnsubscribePage from "./pages/UnsubscribePage.jsx";
 
 function App() {
   const dispatch = useDispatch();
@@ -32,7 +33,7 @@ function App() {
       <Toaster
         position="top-right"
         toastOptions={{
-          duration: 2000, // Toasts show for 2 seconds
+          duration: 2000,
           style: {
             background: "#f7fafc",
             color: "#1a202c",
@@ -88,6 +89,14 @@ function App() {
           element={
             <PublicRoute>
               <ResetPasswordPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/unsubscribe"
+          element={
+            <PublicRoute>
+              <UnsubscribePage />
             </PublicRoute>
           }
         />

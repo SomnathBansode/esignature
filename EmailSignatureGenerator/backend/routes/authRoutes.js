@@ -1,5 +1,4 @@
-// backend/routes/authRoutes.js
-import { Router } from "express";
+import express from "express";
 import {
   register,
   login,
@@ -7,10 +6,28 @@ import {
   resetPassword,
 } from "../controllers/authController.js";
 
-const r = Router();
-r.post("/register", register);
-r.post("/login", login);
-r.post("/forgot-password", forgotPassword); // Forgot password route
-r.post("/reset-password", resetPassword); // Reset password route
+const router = express.Router();
 
-export default r;
+router.post("/register", register);
+router.post("/login", login);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+router.post("/unsubscribe", async (req, res, next) => {
+  const { email } = req.body;
+  try {
+    const { rows } = await query(
+      "UPDATE signature_app.users SET email_notifications = FALSE WHERE lower(email) = lower($1) RETURNING email",
+      [email]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Email not found" });
+    }
+    res.json({
+      message: "You have been unsubscribed from email notifications",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;

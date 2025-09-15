@@ -351,3 +351,6 @@ $fn$;
 ALTER TABLE signature_app.users
 ADD COLUMN IF NOT EXISTS reset_token TEXT,
 ADD COLUMN IF NOT EXISTS reset_token_expiration BIGINT;
+
+ALTER TABLE signature_app.users
+ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN DEFAULT TRUE;

@@ -95,7 +95,21 @@ process.on("SIGTERM", shutdown);
 
 // Start server
 const PORT = process.env.PORT || 5050;
+// app.listen(PORT, async () => {
+//   console.log(`Server running on http://localhost:${PORT}`);
+//   await checkConnection(); // check DB at startup
+// });
+
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  await checkConnection(); // check DB at startup
+  console.log("Env check:", {
+    DATABASE_URL: process.env.DATABASE_URL ? "Set" : "Missing",
+    CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || "Missing",
+    PORT: process.env.PORT || "Missing",
+    JWT_SECRET: process.env.JWT_SECRET ? "Set" : "Missing",
+    EMAIL_USER: process.env.EMAIL_USER || "Missing",
+    EMAIL_PASS: process.env.EMAIL_PASS ? "Set" : "Missing",
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "Missing",
+  });
+  await checkConnection();
 });

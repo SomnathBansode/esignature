@@ -12,7 +12,9 @@ const ResetPasswordPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading } = useSelector((state) => state.user);
+  const { user, loading, successMessage, error } = useSelector(
+    (state) => state.user
+  );
   const [showPassword, setShowPassword] = React.useState(false);
   const [token, setToken] = React.useState("");
   const formRef = useRef(null);
@@ -22,6 +24,7 @@ const ResetPasswordPage = () => {
     register: formRegister,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm();
 
   useEffect(() => {
@@ -34,12 +37,12 @@ const ResetPasswordPage = () => {
     } else {
       console.log("No token found, setting error");
       toast.error("Invalid or missing reset token. Please request a new one.", {
-        duration: 2000,
+        duration: 4000,
       });
       setTimeout(() => {
         dispatch(clearMessages());
         navigate("/forgot-password", { replace: true });
-      }, 2000);
+      }, 4000);
     }
     if (user && !loading) {
       console.log("User exists, redirecting:", user);
@@ -69,7 +72,7 @@ const ResetPasswordPage = () => {
   const onSubmit = async (data) => {
     if (!token) {
       console.log("No token provided, setting error");
-      toast.error("No reset token provided", { duration: 2000 });
+      toast.error("No reset token provided", { duration: 4000 });
       return;
     }
     console.log("Submitting reset password with token:", token);
@@ -81,18 +84,18 @@ const ResetPasswordPage = () => {
         promise,
         {
           loading: "Resetting password...",
-          success: "Password reset successfully!",
+          success: (message) => message || "Password reset successfully!",
           error: (err) => err || "Failed to reset password",
         },
-        { duration: 2000 }
+        { duration: 4000 }
       );
-      console.log("Toast completed, redirecting to /login");
+      reset(); // Clear form after success
       setTimeout(() => {
         dispatch(clearMessages());
         navigate("/login", { replace: true });
-      }, 2000);
+      }, 4000);
     } catch (err) {
-      console.log("Reset password error:", err);
+      console.error("Reset password error:", err);
     }
   };
 
@@ -106,6 +109,10 @@ const ResetPasswordPage = () => {
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Reset Password
         </h2>
+        {successMessage && (
+          <p className="text-green-600 text-center mb-4">{successMessage}</p>
+        )}
+        {error && <p className="text-red-600 text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="relative">
             <input

@@ -11,7 +11,7 @@ import gsap from "gsap";
 const RegisterPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, loading } = useSelector((state) => state.user);
+  const { user, loading, error } = useSelector((state) => state.user);
   const [showPassword, setShowPassword] = React.useState(false);
   const formRef = useRef(null);
   const animatedRef = useRef(false);
@@ -20,6 +20,7 @@ const RegisterPage = () => {
     register: formRegister,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm();
 
   useEffect(() => {
@@ -66,17 +67,18 @@ const RegisterPage = () => {
           success: "Registration successful! Welcome!",
           error: (err) => err || "Registration failed",
         },
-        { duration: 2000 }
+        { duration: 4000 }
       );
+      reset(); // Clear form after success
       console.log("Toast completed, redirecting to dashboard");
       setTimeout(() => {
         dispatch(clearMessages());
         if (user && user.role === "admin")
           navigate("/admin/dashboard", { replace: true });
         else navigate("/dashboard", { replace: true });
-      }, 2000);
+      }, 4000);
     } catch (err) {
-      console.log("Register error:", err);
+      console.error("Register error:", err);
     }
   };
 
@@ -90,6 +92,7 @@ const RegisterPage = () => {
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Register
         </h2>
+        {error && <p className="text-red-600 text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div>
             <input
