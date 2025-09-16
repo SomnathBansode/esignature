@@ -1,10 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
-import userReducer from "./slices/userSlice.js";
-import templateReducer from "./slices/templateSlice.js";
+import userReducer from "./slices/userSlice";
+import signatureReducer from "./slices/signatureSlice";
+import templateReducer from "./slices/templateSlice";
 
 export const store = configureStore({
   reducer: {
     user: userReducer,
-    templates: templateReducer,
+    signature: signatureReducer,
+    template: templateReducer,
   },
 });

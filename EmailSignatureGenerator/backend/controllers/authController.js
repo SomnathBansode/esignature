@@ -7,7 +7,7 @@ import crypto from "crypto";
 // JWT Signing Function
 const sign = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
+    expiresIn: "1h", // 1 hour for tighter security
   });
 };
 
@@ -89,24 +89,55 @@ export const login = async (req, res, next) => {
   console.log(`📝 Login request: email=${email}, origin=${req.headers.origin}`);
   try {
     const { rows } = await query(
-      "SELECT id, name, email, password_hash, role FROM signature_app.users WHERE lower(email) = lower($1)",
+      "SELECT id, name, email, password_hash, role, is_active FROM signature_app.users WHERE lower(email) = lower($1)",
       [email]
     );
 
     const user = rows[0];
     if (!user) {
       console.log(`❌ User not found: ${email}`);
-      throw new Error("User not found");
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    if (!user.is_active) {
+      console.log(`❌ Account suspended: ${email}`);
+      return res.status(403).json({ error: "Account is suspended" });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       console.log(`❌ Invalid credentials for ${email}`);
-      throw new Error("Invalid credentials");
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const token = sign({ id: user.id, role: user.role });
-    res.json({ user, token });
+    const { rows: updated } = await query(
+      "UPDATE signature_app.users SET current_token = $1 WHERE id = $2 RETURNING current_token",
+      [token, user.id]
+    );
+    console.log(
+      `Updated current_token for user ${user.id}:`,
+      updated[0].current_token
+    );
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      token,
+    });
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      token,
+    });
   } catch (error) {
     console.error(`❌ Error in login for ${email}:`, error);
     next(error);
@@ -121,7 +152,7 @@ export const forgotPassword = async (req, res, next) => {
   );
   try {
     const { rows } = await query(
-      "SELECT id, name, email FROM signature_app.users WHERE lower(email) = lower($1)",
+      "SELECT id, name, email, is_active FROM signature_app.users WHERE lower(email) = lower($1)",
       [email]
     );
 
@@ -129,6 +160,11 @@ export const forgotPassword = async (req, res, next) => {
     if (!user) {
       console.log(`❌ Email not found: ${email}`);
       return res.status(404).json({ error: "Email not found" });
+    }
+
+    if (!user.is_active) {
+      console.log(`❌ Account suspended: ${email}`);
+      return res.status(403).json({ error: "Account is suspended" });
     }
 
     const resetToken = crypto.randomBytes(20).toString("hex");
@@ -191,7 +227,7 @@ export const resetPassword = async (req, res, next) => {
   );
   try {
     const { rows } = await query(
-      "SELECT id, reset_token, reset_token_expiration, email, name FROM signature_app.users WHERE reset_token = $1",
+      "SELECT id, reset_token, reset_token_expiration, email, name, is_active FROM signature_app.users WHERE reset_token = $1",
       [token]
     );
 
@@ -201,6 +237,11 @@ export const resetPassword = async (req, res, next) => {
       return res.status(400).json({ error: "Invalid token" });
     }
 
+    if (!user.is_active) {
+      console.log(`❌ Account suspended: ${user.email}`);
+      return res.status(403).json({ error: "Account is suspended" });
+    }
+
     if (Date.now() > user.reset_token_expiration) {
       console.log(`❌ Token expired for user: ${user.email}`);
       return res.status(400).json({ error: "Token has expired" });
@@ -208,7 +249,7 @@ export const resetPassword = async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await query(
-      "UPDATE signature_app.users SET password_hash = $1, reset_token = NULL, reset_token_expiration = NULL WHERE id = $2",
+      "UPDATE signature_app.users SET password_hash = $1, reset_token = NULL, reset_token_expiration = NULL, current_token = NULL WHERE id = $2",
       [hashedPassword, user.id]
     );
 

@@ -444,3 +444,531 @@ CREATE OR REPLACE FUNCTION signature_app.update_template(
   RETURNING *;
 $$ LANGUAGE SQL;
 
+ALTER TABLE signature_app.users ADD COLUMN is_active BOOLEAN DEFAULT true;
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Database updates for existing schema
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- ====================================
+-- Update register_user to include audit logging
+-- ====================================
+DROP FUNCTION IF EXISTS signature_app.register_user(text, text, text, text) CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.register_user(
+  p_name TEXT, 
+  p_email TEXT, 
+  p_hash TEXT, 
+  p_role TEXT
+)
+RETURNS signature_app.users
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = signature_app, public
+AS $$
+DECLARE
+  u signature_app.users;
+BEGIN
+  INSERT INTO signature_app.users(name, email, password_hash, role)
+  VALUES (p_name, p_email, p_hash, COALESCE(p_role, 'user'))
+  RETURNING * INTO u;
+  INSERT INTO signature_app.audit_log(action, data)
+  VALUES ('USER_REGISTER', jsonb_build_object('user_id', u.id, 'email', u.email));
+  RETURN u;
+END;
+$$;
+
+-- ====================================
+-- Update get_admin_stats to include recent activity
+-- ====================================
+DROP FUNCTION IF EXISTS signature_app.get_admin_stats() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.get_admin_stats()
+RETURNS JSON
+LANGUAGE plpgsql
+STABLE
+SET search_path = signature_app, public
+AS $$
+DECLARE
+  out JSON;
+BEGIN
+  SELECT json_build_object(
+    'total_users', (SELECT COUNT(*) FROM signature_app.users),
+    'total_signatures', (SELECT COUNT(*) FROM signature_app.signatures),
+    'popular_templates', (
+      SELECT COALESCE(json_agg(t), '[]'::json) FROM (
+        SELECT t.id, t.name, COALESCE(a.total_signatures, 0) AS uses
+        FROM signature_app.templates t
+        LEFT JOIN signature_app.analytics a ON a.template_id = t.id
+        ORDER BY COALESCE(a.total_signatures, 0) DESC, t.created_at DESC
+        LIMIT 10
+      ) t
+    ),
+    'recent_activity', (
+      SELECT COALESCE(json_agg(a), '[]'::json) FROM (
+        SELECT
+          CASE
+            WHEN action = 'SIGNATURE_INSERT' THEN 'User ' || (data->>'user_id')::text || ' created signature'
+            WHEN action = 'SIGNATURE_UPDATE' THEN 'User ' || (data->>'user_id')::text || ' updated signature'
+            WHEN action = 'SIGNATURE_DELETE' THEN 'User ' || (data->>'user_id')::text || ' deleted signature'
+            WHEN action = 'TEMPLATE_ADD' THEN 'Admin ' || (data->>'user_id')::text || ' created template ' || (data->>'name')::text
+            WHEN action = 'TEMPLATE_UPDATE' THEN 'Admin ' || (data->>'user_id')::text || ' updated template ' || (data->>'name')::text
+            WHEN action = 'TEMPLATE_DELETE' THEN 'Admin ' || (data->>'user_id')::text || ' deleted template ' || (data->>'name')::text
+            WHEN action = 'USER_REGISTER' THEN 'User ' || (data->>'email')::text || ' registered'
+            WHEN action = 'USER_SUSPEND' THEN 'Admin ' || (data->>'admin_id')::text || ' suspended user ' || (data->>'email')::text
+            WHEN action = 'USER_ACTIVATE' THEN 'Admin ' || (data->>'admin_id')::text || ' activated user ' || (data->>'email')::text
+            WHEN action = 'USER_DELETE' THEN 'Admin ' || (data->>'admin_id')::text || ' deleted user ' || (data->>'email')::text
+          END AS description,
+          created_at AS timestamp
+        FROM signature_app.audit_log
+        WHERE action IN (
+          'SIGNATURE_INSERT', 'SIGNATURE_UPDATE', 'SIGNATURE_DELETE',
+          'TEMPLATE_ADD', 'TEMPLATE_UPDATE', 'TEMPLATE_DELETE',
+          'USER_REGISTER', 'USER_SUSPEND', 'USER_ACTIVATE', 'USER_DELETE'
+        )
+        ORDER BY created_at DESC
+        LIMIT 5
+      ) a
+    )
+  ) INTO out;
+  RETURN out;
+END;
+$$;
+
+-- ====================================
+-- Trigger functions for audit logging
+-- ====================================
+
+-- Audit signature actions (INSERT, UPDATE, DELETE)
+DROP FUNCTION IF EXISTS signature_app.trg_audit_signatures() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_signatures()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('SIGNATURE_INSERT', to_jsonb(NEW));
+  ELSIF TG_OP = 'UPDATE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('SIGNATURE_UPDATE', to_jsonb(NEW));
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('SIGNATURE_DELETE', jsonb_build_object('user_id', OLD.user_id, 'signature_id', OLD.id));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Audit template actions
+DROP FUNCTION IF EXISTS signature_app.trg_audit_templates() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_templates()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('TEMPLATE_ADD', jsonb_build_object('user_id', NEW.created_by, 'template_id', NEW.id, 'name', NEW.name));
+  ELSIF TG_OP = 'UPDATE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('TEMPLATE_UPDATE', jsonb_build_object('user_id', NEW.created_by, 'template_id', NEW.id, 'name', NEW.name));
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('TEMPLATE_DELETE', jsonb_build_object('user_id', OLD.created_by, 'template_id', OLD.id, 'name', OLD.name));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Audit user actions
+DROP FUNCTION IF EXISTS signature_app.trg_audit_users() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_users()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.is_active != NEW.is_active THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES (
+      CASE WHEN NEW.is_active THEN 'USER_ACTIVATE' ELSE 'USER_SUSPEND' END,
+      jsonb_build_object('admin_id', NULL, 'user_id', NEW.id, 'email', NEW.email)
+    );
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('USER_DELETE', jsonb_build_object('admin_id', NULL, 'user_id', OLD.id, 'email', OLD.email));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ====================================
+-- Update triggers
+-- ====================================
+DROP TRIGGER IF EXISTS audit_signature_insert ON signature_app.signatures;
+CREATE TRIGGER audit_signature_actions
+AFTER INSERT OR UPDATE OR DELETE ON signature_app.signatures
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_signatures();
+
+DROP TRIGGER IF EXISTS audit_template_actions ON signature_app.templates;
+CREATE TRIGGER audit_template_actions
+AFTER INSERT OR UPDATE OR DELETE ON signature_app.templates
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_templates();
+
+DROP TRIGGER IF EXISTS audit_user_actions ON signature_app.users;
+CREATE TRIGGER audit_user_actions
+AFTER UPDATE OR DELETE ON signature_app.users
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_users();
+
+-- ====================================
+-- Add indexes for performance
+-- ====================================
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON signature_app.audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON signature_app.audit_log(created_at);
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Fix for a.total_signatures error and admin mode audit logging
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- ====================================
+-- Update get_admin_stats to ensure proper aggregation
+-- ====================================
+DROP FUNCTION IF EXISTS signature_app.get_admin_stats() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.get_admin_stats()
+RETURNS JSON
+LANGUAGE plpgsql
+STABLE
+SET search_path = signature_app, public
+AS $$
+DECLARE
+  out JSON;
+BEGIN
+  SELECT json_build_object(
+    'total_users', (SELECT COUNT(*) FROM signature_app.users),
+    'total_signatures', (SELECT COUNT(*) FROM signature_app.signatures),
+    'popular_templates', (
+      SELECT COALESCE(json_agg(t), '[]'::json) FROM (
+        SELECT t.id, t.name, COALESCE(a.total_signatures, 0) AS uses
+        FROM signature_app.templates t
+        LEFT JOIN signature_app.analytics a ON a.template_id = t.id
+        ORDER BY COALESCE(a.total_signatures, 0) DESC, t.created_at DESC
+        LIMIT 10
+      ) t
+    ),
+    'recent_activity', (
+      SELECT COALESCE(json_agg(a), '[]'::json) FROM (
+        SELECT
+          CASE
+            WHEN action = 'SIGNATURE_INSERT' THEN 'User ' || (data->>'user_id')::text || ' created signature'
+            WHEN action = 'SIGNATURE_UPDATE' THEN 'User ' || (data->>'user_id')::text || ' updated signature'
+            WHEN action = 'SIGNATURE_DELETE' THEN 'User ' || (data->>'user_id')::text || ' deleted signature'
+            WHEN action = 'TEMPLATE_ADD' THEN 'Admin ' || (data->>'user_id')::text || ' created template ' || (data->>'name')::text
+            WHEN action = 'TEMPLATE_UPDATE' THEN 'Admin ' || (data->>'user_id')::text || ' updated template ' || (data->>'name')::text
+            WHEN action = 'TEMPLATE_DELETE' THEN 'Admin ' || (data->>'user_id')::text || ' deleted template ' || (data->>'name')::text
+            WHEN action = 'USER_REGISTER' THEN 'User ' || (data->>'email')::text || ' registered'
+            WHEN action = 'USER_SUSPEND' THEN 'Admin ' || (data->>'admin_id')::text || ' suspended user ' || (data->>'email')::text
+            WHEN action = 'USER_ACTIVATE' THEN 'Admin ' || (data->>'admin_id')::text || ' activated user ' || (data->>'email')::text
+            WHEN action = 'USER_DELETE' THEN 'Admin ' || (data->>'admin_id')::text || ' deleted user ' || (data->>'email')::text
+            WHEN action = 'ADMIN_MODE_SWITCH' THEN 'User ' || (data->>'user_id')::text || ' switched to admin mode'
+          END AS description,
+          created_at AS timestamp
+        FROM signature_app.audit_log
+        WHERE action IN (
+          'SIGNATURE_INSERT', 'SIGNATURE_UPDATE', 'SIGNATURE_DELETE',
+          'TEMPLATE_ADD', 'TEMPLATE_UPDATE', 'TEMPLATE_DELETE',
+          'USER_REGISTER', 'USER_SUSPEND', 'USER_ACTIVATE', 'USER_DELETE',
+          'ADMIN_MODE_SWITCH'
+        )
+        ORDER BY created_at DESC
+        LIMIT 5
+      ) a
+    )
+  ) INTO out;
+  RETURN out;
+END;
+$$;
+
+-- ====================================
+-- Update register_user to include audit logging
+-- ====================================
+DROP FUNCTION IF EXISTS signature_app.register_user(text, text, text, text) CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.register_user(
+  p_name TEXT, 
+  p_email TEXT, 
+  p_hash TEXT, 
+  p_role TEXT
+)
+RETURNS signature_app.users
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = signature_app, public
+AS $$
+DECLARE
+  u signature_app.users;
+BEGIN
+  INSERT INTO signature_app.users(name, email, password_hash, role, is_active)
+  VALUES (p_name, p_email, p_hash, COALESCE(p_role, 'user'), true)
+  RETURNING * INTO u;
+  INSERT INTO signature_app.audit_log(action, data)
+  VALUES ('USER_REGISTER', jsonb_build_object('user_id', u.id, 'email', u.email));
+  RETURN u;
+END;
+$$;
+
+-- ====================================
+-- Add function to log admin mode switch
+-- ====================================
+DROP FUNCTION IF EXISTS signature_app.log_admin_mode_switch(uuid) CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.log_admin_mode_switch(
+  p_user_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  INSERT INTO signature_app.audit_log(action, data)
+  VALUES ('ADMIN_MODE_SWITCH', jsonb_build_object('user_id', p_user_id));
+END;
+$$;
+
+-- ====================================
+-- Update trigger functions for audit logging
+-- ====================================
+
+-- Audit signature actions (INSERT, UPDATE, DELETE)
+DROP FUNCTION IF EXISTS signature_app.trg_audit_signatures() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_signatures()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('SIGNATURE_INSERT', to_jsonb(NEW));
+  ELSIF TG_OP = 'UPDATE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('SIGNATURE_UPDATE', to_jsonb(NEW));
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('SIGNATURE_DELETE', jsonb_build_object('user_id', OLD.user_id, 'signature_id', OLD.id));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Audit template actions
+DROP FUNCTION IF EXISTS signature_app.trg_audit_templates() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_templates()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('TEMPLATE_ADD', jsonb_build_object('user_id', NEW.created_by, 'template_id', NEW.id, 'name', NEW.name));
+  ELSIF TG_OP = 'UPDATE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('TEMPLATE_UPDATE', jsonb_build_object('user_id', NEW.created_by, 'template_id', NEW.id, 'name', NEW.name));
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('TEMPLATE_DELETE', jsonb_build_object('user_id', OLD.created_by, 'template_id', OLD.id, 'name', OLD.name));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Audit user actions
+DROP FUNCTION IF EXISTS signature_app.trg_audit_users() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_users()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.is_active != NEW.is_active THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES (
+      CASE WHEN NEW.is_active THEN 'USER_ACTIVATE' ELSE 'USER_SUSPEND' END,
+      jsonb_build_object('admin_id', NULL, 'user_id', NEW.id, 'email', NEW.email)
+    );
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES ('USER_DELETE', jsonb_build_object('admin_id', NULL, 'user_id', OLD.id, 'email', OLD.email));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ====================================
+-- Update triggers
+-- ====================================
+DROP TRIGGER IF EXISTS audit_signature_insert ON signature_app.signatures;
+CREATE TRIGGER audit_signature_actions
+AFTER INSERT OR UPDATE OR DELETE ON signature_app.signatures
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_signatures();
+
+DROP TRIGGER IF EXISTS audit_template_actions ON signature_app.templates;
+CREATE TRIGGER audit_template_actions
+AFTER INSERT OR UPDATE OR DELETE ON signature_app.templates
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_templates();
+
+DROP TRIGGER IF EXISTS audit_user_actions ON signature_app.users;
+CREATE TRIGGER audit_user_actions
+AFTER UPDATE OR DELETE ON signature_app.users
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_users();
+
+-- ====================================
+-- Add indexes for performance
+-- ====================================
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON signature_app.audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON signature_app.audit_log(created_at);
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Fix user suspension audit logging
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- Update audit user trigger to accept admin_id from backend
+DROP FUNCTION IF EXISTS signature_app.trg_audit_users() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_users()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.is_active != NEW.is_active THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES (
+      CASE WHEN NEW.is_active THEN 'USER_ACTIVATE' ELSE 'USER_SUSPEND' END,
+      jsonb_build_object(
+        'admin_id', current_setting('app.current_user_id', true)::uuid,
+        'user_id', NEW.id,
+        'email', NEW.email
+      )
+    );
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES (
+      'USER_DELETE',
+      jsonb_build_object(
+        'admin_id', current_setting('app.current_user_id', true)::uuid,
+        'user_id', OLD.id,
+        'email', OLD.email
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS audit_user_actions ON signature_app.users;
+CREATE TRIGGER audit_user_actions
+AFTER UPDATE OR DELETE ON signature_app.users
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_users();
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Add token blacklist table
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+CREATE TABLE IF NOT EXISTS signature_app.token_blacklist (
+  token TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES signature_app.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_user_id ON signature_app.token_blacklist(user_id);
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Enhance token management
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- Add column to store current token in users table
+ALTER TABLE signature_app.users
+ADD COLUMN IF NOT EXISTS current_token TEXT;
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Enhance token management
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- Add column to store current token in users table
+ALTER TABLE signature_app.users
+ADD COLUMN IF NOT EXISTS current_token TEXT;
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Enhance token management
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- Add column to store current token in users table
+ALTER TABLE signature_app.users
+ADD COLUMN IF NOT EXISTS current_token TEXT;
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Enhance token management
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+-- Add column to store current token in users table
+ALTER TABLE signature_app.users
+ADD COLUMN IF NOT EXISTS current_token TEXT;
+
+
+-- sqlfluff: dialect=postgres
+-- EmailSignatureGenerator: Fix audit user trigger for NULL admin_id
+-- Run in pgAdmin4 or psql. Safe to re-run.
+
+SET search_path TO signature_app, public;
+
+DROP FUNCTION IF EXISTS signature_app.trg_audit_users() CASCADE;
+CREATE OR REPLACE FUNCTION signature_app.trg_audit_users()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = signature_app, public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.is_active != NEW.is_active THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES (
+      CASE WHEN NEW.is_active THEN 'USER_ACTIVATE' ELSE 'USER_SUSPEND' END,
+      jsonb_build_object(
+        'admin_id', NULLIF(current_setting('app.current_user_id', true), '')::uuid,
+        'user_id', NEW.id,
+        'email', NEW.email
+      )
+    );
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO signature_app.audit_log(action, data)
+    VALUES (
+      'USER_DELETE',
+      jsonb_build_object(
+        'admin_id', NULLIF(current_setting('app.current_user_id', true), '')::uuid,
+        'user_id', OLD.id,
+        'email', OLD.email
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS audit_user_actions ON signature_app.users;
+CREATE TRIGGER audit_user_actions
+AFTER UPDATE OR DELETE ON signature_app.users
+FOR EACH ROW EXECUTE FUNCTION signature_app.trg_audit_users();

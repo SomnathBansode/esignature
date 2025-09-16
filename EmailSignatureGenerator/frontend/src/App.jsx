@@ -1,12 +1,14 @@
 import React, { useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProfile, setAdminMode } from "./redux/slices/userSlice";
+import { fetchProfile, setAdminMode, logout } from "./redux/slices/userSlice";
+import axios from "axios";
 import { Toaster } from "react-hot-toast";
 
 import Navbar from "./components/Navbar.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import PublicRoute from "./components/PublicRoute.jsx";
+import HomeRedirect from "./components/HomeRedirect.jsx";
 
 import HomePage from "./pages/HomePage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -15,33 +17,67 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import Dashboard from "./pages/user/Dashboard.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
+import AdminUsers from "./pages/admin/AdminUsers.jsx";
+import AdminTemplates from "./pages/admin/AdminTemplates.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import SignatureListPage from "./pages/SignatureListPage.jsx";
 import UnsubscribePage from "./pages/UnsubscribePage.jsx";
 
 function App() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, isAdminMode } = useSelector((state) => state.user);
+  const { user, loading, isAdminMode, token } = useSelector(
+    (state) => state.user
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       dispatch(fetchProfile());
     } else {
-      dispatch({ type: "user/logout" });
+      dispatch(logout());
     }
   }, [dispatch]);
 
   useEffect(() => {
-    if (user?.role === "admin" && !loading) {
-      if (location.pathname === "/admin/dashboard" && !isAdminMode) {
+    if (!loading && user?.role === "admin") {
+      if (location.pathname.startsWith("/admin/") && !isAdminMode) {
         dispatch(setAdminMode(true));
+        axios
+          .post(
+            `${import.meta.env.VITE_API_URL}/api/admin/log-admin-mode`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          .catch((err) =>
+            console.error("Failed to log admin mode switch:", err)
+          );
       } else if (location.pathname === "/dashboard" && isAdminMode) {
         dispatch(setAdminMode(false));
       }
     }
-  }, [user, loading, location.pathname, isAdminMode, dispatch]);
+  }, [user, loading, location.pathname, isAdminMode, dispatch, token]);
+
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (
+          error.response?.status === 403 &&
+          error.response?.data?.error === "Account is suspended"
+        ) {
+          dispatch(logout());
+          localStorage.removeItem("token");
+          navigate("/login", {
+            state: { error: "Your account has been suspended" },
+          });
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, [dispatch, navigate]);
 
   return (
     <>
@@ -76,6 +112,7 @@ function App() {
       />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/redirect" element={<HomeRedirect />} />
         <Route
           path="/login"
           element={
@@ -129,6 +166,22 @@ function App() {
           element={
             <PrivateRoute adminOnly={true}>
               <AdminDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <PrivateRoute adminOnly={true}>
+              <AdminUsers />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/templates"
+          element={
+            <PrivateRoute adminOnly={true}>
+              <AdminTemplates />
             </PrivateRoute>
           }
         />

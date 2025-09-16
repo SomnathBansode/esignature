@@ -1,4 +1,3 @@
-// backend/routes/adminRoutes.js
 import { Router } from "express";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
 import {
@@ -6,19 +5,28 @@ import {
   addTemplate,
   updateTemplate,
   deleteTemplate,
+  getTemplateById,
 } from "../controllers/templateController.js";
 import { adminStats } from "../controllers/signatureController.js";
-import { getUsers } from "../controllers/userController.js";
+import {
+  getUsers,
+  updateUser,
+  deleteUser,
+  logAdminModeSwitch,
+} from "../controllers/userController.js";
 
 const router = Router();
 
 // Admin routes
-router.get("/stats", protect, adminOnly, adminStats); // Admin: Get stats
-router.get("/templates", protect, adminOnly, getTemplates); // Admin: Get templates
-router.post("/templates", protect, adminOnly, addTemplate); // Admin: Add template
-router.put("/templates/:id", protect, adminOnly, updateTemplate); // Admin: Update template
-router.delete("/templates/:id", protect, adminOnly, deleteTemplate); // Admin: Delete template
-
-router.get("/users", protect, adminOnly, getUsers); // Admin: Get all users
+router.get("/stats", protect, adminOnly, adminStats);
+router.get("/templates", protect, adminOnly, getTemplates);
+router.get("/templates/:id", protect, adminOnly, getTemplateById);
+router.post("/templates", protect, adminOnly, addTemplate);
+router.put("/templates/:id", protect, adminOnly, updateTemplate);
+router.delete("/templates/:id", protect, adminOnly, deleteTemplate);
+router.get("/users", protect, adminOnly, getUsers);
+router.put("/users/:id", protect, adminOnly, updateUser);
+router.delete("/users/:id", protect, adminOnly, deleteUser);
+router.post("/log-admin-mode", protect, adminOnly, logAdminModeSwitch);
 
 export default router;

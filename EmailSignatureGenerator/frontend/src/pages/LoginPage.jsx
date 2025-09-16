@@ -28,6 +28,9 @@ const LoginPage = () => {
 
   useEffect(() => {
     dispatch(clearMessages());
+    if (location.state?.error) {
+      toast.error(location.state.error);
+    }
     if (user && !loading && location.pathname === "/login") {
       console.log("LoginPage redirect:", { user, isAdminMode });
       const redirectPath =
@@ -50,7 +53,15 @@ const LoginPage = () => {
         }
       );
     }
-  }, [user, isAdminMode, navigate, dispatch, loading, location.pathname]);
+  }, [
+    user,
+    isAdminMode,
+    navigate,
+    dispatch,
+    loading,
+    location.pathname,
+    location.state,
+  ]);
 
   const onSubmit = async (data) => {
     try {

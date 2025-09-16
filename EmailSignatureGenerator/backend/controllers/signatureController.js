@@ -1,33 +1,21 @@
 import { query } from "../config/db.js";
 
-// backend/controllers/signatureController.js
-// backend/controllers/signatureController.js
 export const createSignature = async (req, res, next) => {
   try {
     const { template_id, form_data, html_code } = req.body;
-    const idemKey = req.get("Idempotency-Key") || null;
-    const userId = req.user.id;
-
-    // Make sure form_data and html_code are correctly parsed and stored
-    console.log("Form Data: ", form_data); // You can remove this after testing
-    console.log("HTML Code: ", html_code); // You can remove this after testing
-
-    // Inserting signature into the database
+    const user_id = req.user.id;
     const { rows } = await query(
-      "SELECT * FROM signature_app.create_signature_idempotent($1, $2, $3, $4, $5)",
-      [userId, template_id, form_data, html_code, idemKey]
+      "SELECT * FROM signature_app.create_signature($1, $2, $3, $4)",
+      [user_id, template_id, form_data, html_code]
     );
-
-    res.json(rows[0]); // Return created signature data
-  } catch (error) {
-    next(error); // Handle any errors
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
   }
 };
-
-// backend/controllers/signatureController.js
 export const mySignatures = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10 } = req.query; // Default to page 1 and 10 items per page
+    const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
     const { rows } = await query(
@@ -35,57 +23,59 @@ export const mySignatures = async (req, res, next) => {
       [req.user.id, limit, offset]
     );
 
-    res.json(rows); // Send the paginated signatures back
+    res.json(rows);
   } catch (e) {
     next(e);
   }
 };
 
-// backend/controllers/signatureController.js
-// backend/controllers/signatureController.js
-
-export const adminStats = async (_req, res, next) => {
+export const adminStats = async (req, res, next) => {
   try {
-    const { rows } = await query(
-      "SELECT signature_app.get_admin_stats() as stats"
-    );
-    res.json(rows[0].stats); // Return the stats object
+    const { rows } = await query("SELECT signature_app.get_admin_stats()");
+    if (rows.length === 0) {
+      return res.status(500).json({ error: "Failed to fetch admin stats" });
+    }
+    res.json(rows[0].get_admin_stats);
   } catch (e) {
+    console.error("Admin stats error:", e);
+    res.status(400).json({ error: e.message });
     next(e);
   }
 };
 
 export const updateSignature = async (req, res, next) => {
   try {
-    const { id } = req.params; // Get the signature ID from the URL
-    const { form_data, html_code } = req.body; // Get updated form data and HTML code from the request body
-
-    // Update the signature with new form data and HTML code
+    const { id } = req.params;
+    const { form_data, html_code } = req.body;
+    const user_id = req.user.id;
     const { rows } = await query(
-      "SELECT * FROM signature_app.update_signature($1, $2, $3, $4)", // Update query
-      [id, req.user.id, form_data, html_code] // Pass signature ID, user ID, updated form data, and HTML code
+      "SELECT * FROM signature_app.update_signature($1, $2, $3, $4)",
+      [id, user_id, form_data, html_code]
     );
-
-    res.json(rows[0]); // Send the updated signature back to the client
+    if (rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Signature not found or not owned by user" });
+    }
+    res.json(rows[0]);
   } catch (e) {
-    next(e); // Handle errors
+    next(e);
   }
 };
-
 export const deleteSignature = async (req, res, next) => {
   try {
-    const { id } = req.params; // Signature ID
+    const { id } = req.params;
     await query("SELECT signature_app.delete_signature($1)", [id]);
-    res.json({ ok: true });
+    res.json({ message: "Signature deleted successfully" });
   } catch (e) {
     next(e);
   }
 };
 export const getSignatureById = async (req, res, next) => {
   try {
-    const { id } = req.params; // Signature ID
+    const { id } = req.params;
     const { rows } = await query(
-      "SELECT * FROM signature_app.get_user_signatures($1) WHERE id = $2", // Filter by user ID
+      "SELECT * FROM signature_app.get_user_signatures($1) WHERE id = $2",
       [req.user.id, id]
     );
 
@@ -93,7 +83,19 @@ export const getSignatureById = async (req, res, next) => {
       return res.status(404).json({ error: "Signature not found" });
     }
 
-    res.json(rows[0]); // Return the signature
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+};
+export const getUserSignatures = async (req, res, next) => {
+  try {
+    const user_id = req.user.id;
+    const { rows } = await query(
+      "SELECT * FROM signature_app.get_user_signatures($1)",
+      [user_id]
+    );
+    res.json(rows);
   } catch (e) {
     next(e);
   }

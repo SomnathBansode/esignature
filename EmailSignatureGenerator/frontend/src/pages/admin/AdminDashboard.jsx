@@ -1,21 +1,15 @@
-import React, { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
-import { ClipLoader } from "react-spinners";
+import toast from "react-hot-toast";
+import { useSelector } from "react-redux";
 
-const AdminDashboard = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { user, token } = useSelector((state) => state.user);
-  const [stats, setStats] = React.useState(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
+function AdminDashboard() {
+  const [stats, setStats] = useState(null);
+  const { token } = useSelector((state) => state.user);
 
   useEffect(() => {
-    if (!user || user.role !== "admin") navigate("/login");
     const fetchStats = async () => {
-      setLoading(true);
       try {
         const response = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/admin/stats`,
@@ -24,46 +18,90 @@ const AdminDashboard = () => {
           }
         );
         setStats(response.data);
-      } catch (err) {
-        setError(err.response?.data?.error || "Failed to fetch stats");
-      } finally {
-        setLoading(false);
+        console.log("Dashboard refreshed!", response.data);
+      } catch (error) {
+        console.error(
+          "Failed to fetch stats:",
+          error.response?.data?.error || error.message
+        );
+        toast.error("Failed to load dashboard stats");
+        setStats({
+          total_users: 0,
+          total_signatures: 0,
+          popular_templates: [],
+          recent_activity: [],
+        });
       }
     };
     fetchStats();
-  }, [user, token, navigate]);
-
-  if (loading) return <div className="text-center mt-20">Loading...</div>;
-  if (error)
-    return <div className="text-center mt-20 text-red-500">{error}</div>;
+  }, [token]);
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">Admin Dashboard</h1>
-      {stats && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-white shadow rounded">
-            <h2 className="text-xl font-semibold">Total Users</h2>
-            <p className="text-2xl">{stats.total_users}</p>
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">
+          Admin Dashboard
+        </h1>
+        {stats ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Total Users
+              </h2>
+              <p className="text-2xl text-blue-600">{stats.total_users}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Total Signatures
+              </h2>
+              <p className="text-2xl text-blue-600">{stats.total_signatures}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Popular Templates
+              </h2>
+              <ul className="mt-4 space-y-2">
+                {stats.popular_templates.map((template) => (
+                  <li key={template.id} className="text-gray-600">
+                    {template.name}: {template.uses} uses
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md col-span-1 md:col-span-2 lg:col-span-3">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Recent Activity
+              </h2>
+              <ul className="mt-4 space-y-2">
+                {stats.recent_activity.map((activity, index) => (
+                  <li key={index} className="text-gray-600">
+                    {activity.description} at{" "}
+                    {new Date(activity.timestamp).toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="p-4 bg-white shadow rounded">
-            <h2 className="text-xl font-semibold">Total Signatures</h2>
-            <p className="text-2xl">{stats.total_signatures}</p>
-          </div>
-          <div className="p-4 bg-white shadow rounded col-span-2">
-            <h2 className="text-xl font-semibold">Popular Templates</h2>
-            <ul>
-              {stats.popular_templates.map((template) => (
-                <li key={template.id}>
-                  {template.name}: {template.uses} uses
-                </li>
-              ))}
-            </ul>
-          </div>
+        ) : (
+          <p className="text-gray-600">Loading stats...</p>
+        )}
+        <div className="mt-6 flex space-x-4">
+          <Link
+            to="/admin/users"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Manage Users
+          </Link>
+          <Link
+            to="/admin/templates"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Manage Templates
+          </Link>
         </div>
-      )}
+      </div>
     </div>
   );
-};
+}
 
 export default AdminDashboard;
