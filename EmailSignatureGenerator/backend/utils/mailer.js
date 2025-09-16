@@ -1,12 +1,14 @@
 import nodemailer from "nodemailer";
 import sendgridTransport from "nodemailer-sendgrid";
 
-// Configure Nodemailer with SendGrid
-const transporter = nodemailer.createTransport(
-  sendgridTransport({
-    apiKey: process.env.SENDGRID_API_KEY,
-  })
-);
+// Create a transporter for SMTP
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 // Reusable HTML email template
 const generateEmailTemplate = ({
@@ -77,10 +79,47 @@ const generateEmailTemplate = ({
 };
 
 // Send email function with anti-spam best practices
+// export const sendEmail = async (to, subject, text, htmlOptions) => {
+//   try {
+//     const html = generateEmailTemplate({ ...htmlOptions, email: to });
+//     await transporter.sendMail({
+//       from: `"Email Signature Generator" <${process.env.EMAIL_USER}>`,
+//       to,
+//       subject,
+//       text,
+//       html,
+//       headers: {
+//         "X-PM-Message-Stream": "outbound",
+//         "List-Unsubscribe": `<${
+//           process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
+//         }/unsubscribe?email=${encodeURIComponent(to)}>`,
+//       },
+//     });
+//     console.log(`Email sent to ${to}`);
+//   } catch (error) {
+//     console.error("Error sending email:", error);
+//     throw new Error("Email sending failed");
+//   }
+// };
+
 export const sendEmail = async (to, subject, text, htmlOptions) => {
   try {
+    console.log(`Attempting to send email to ${to} with subject: ${subject}`);
+    console.log(`Using EMAIL_USER: ${process.env.EMAIL_USER}`);
+    console.log(`HTML Options:`, htmlOptions);
+
+    // Verify transporter before sending
+    await transporter.verify((error, success) => {
+      if (error) {
+        console.error("Transporter verification failed:", error);
+        throw new Error("SMTP transporter verification failed");
+      } else {
+        console.log("SMTP transporter is ready");
+      }
+    });
+
     const html = generateEmailTemplate({ ...htmlOptions, email: to });
-    await transporter.sendMail({
+    const mailOptions = {
       from: `"Email Signature Generator" <${process.env.EMAIL_USER}>`,
       to,
       subject,
@@ -92,10 +131,14 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
           process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
         }/unsubscribe?email=${encodeURIComponent(to)}>`,
       },
-    });
-    console.log(`Email sent to ${to}`);
+    };
+    console.log("Mail options:", mailOptions);
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Email sent to ${to}, Message ID: ${info.messageId}`);
+    return info;
   } catch (error) {
-    console.error("Error sending email:", error);
-    throw new Error("Email sending failed");
+    console.error(`Error sending email to ${to}:`, error);
+    throw new Error(`Email sending failed: ${error.message}`);
   }
 };
