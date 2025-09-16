@@ -14,6 +14,9 @@ const sign = (payload) => {
 // Register User
 export const register = async (req, res, next) => {
   const { name, email, password, role } = req.body;
+  console.log(
+    `📝 Register request: email=${email}, origin=${req.headers.origin}`
+  );
   try {
     const { rows } = await query(
       "SELECT * FROM signature_app.users WHERE lower(email) = lower($1)",
@@ -21,6 +24,7 @@ export const register = async (req, res, next) => {
     );
 
     if (rows.length > 0) {
+      console.log(`❌ Email ${email} already in use`);
       return res.status(400).json({ error: "Email is already in use" });
     }
 
@@ -35,32 +39,46 @@ export const register = async (req, res, next) => {
     const token = sign({ id: user.id, role: user.role });
 
     // Send registration email
-    const emailText = `Hi ${
-      user.name
-    },\n\nWelcome to Email Signature Generator! Your account is ready. Start creating professional email signatures now.\n\nVisit: ${
-      process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
-    }`;
-    const emailHtmlOptions = {
-      title: "Welcome to Email Signature Generator",
-      greeting: `Hi ${user.name},`,
-      message:
-        "Your account is ready! Create your first professional email signature to enhance your emails.",
-      ctaText: "Create Signature",
-      ctaLink: `${
-        process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
-      }/signatures/create`,
-      footerText:
-        "We’re excited to have you with us! Contact support@yourdomain.com if you need help.",
-    };
-    await sendEmail(
-      user.email,
-      "Welcome to Email Signature Generator",
-      emailText,
-      emailHtmlOptions
-    );
+    console.log(`📧 Preparing to send welcome email to ${user.email}`);
+    try {
+      const emailText = `Hi ${
+        user.name
+      },\n\nWelcome to Email Signature Generator! Your account is ready. Start creating professional email signatures now.\n\nVisit: ${
+        process.env.CLIENT_ORIGIN || "https://esignaturewebapp.netlify.app"
+      }`;
+      const emailHtmlOptions = {
+        title: "Welcome to Email Signature Generator",
+        greeting: `Hi ${user.name},`,
+        message:
+          "Your account is ready! Create your first professional email signature to enhance your emails.",
+        ctaText: "Create Signature",
+        ctaLink: `${
+          process.env.CLIENT_ORIGIN || "https://esignaturewebapp.netlify.app"
+        }/signatures/create`,
+        footerText:
+          "We’re excited to have you with us! Contact support@yourdomain.com if you need help.",
+        email: user.email,
+      };
+      await sendEmail(
+        user.email,
+        "Welcome to Email Signature Generator",
+        emailText,
+        emailHtmlOptions
+      );
+      console.log(`✅ Welcome email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error(
+        `❌ Failed to send welcome email to ${user.email}:`,
+        emailError
+      );
+      return res.status(500).json({
+        error: `Registration succeeded but email sending failed: ${emailError.message}`,
+      });
+    }
 
     res.json({ user, token });
   } catch (error) {
+    console.error(`❌ Error in register for ${email}:`, error);
     next(error);
   }
 };
@@ -68,6 +86,7 @@ export const register = async (req, res, next) => {
 // User Login
 export const login = async (req, res, next) => {
   const { email, password } = req.body;
+  console.log(`📝 Login request: email=${email}, origin=${req.headers.origin}`);
   try {
     const { rows } = await query(
       "SELECT id, name, email, password_hash, role FROM signature_app.users WHERE lower(email) = lower($1)",
@@ -75,14 +94,21 @@ export const login = async (req, res, next) => {
     );
 
     const user = rows[0];
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      console.log(`❌ User not found: ${email}`);
+      throw new Error("User not found");
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) throw new Error("Invalid credentials");
+    if (!isPasswordValid) {
+      console.log(`❌ Invalid credentials for ${email}`);
+      throw new Error("Invalid credentials");
+    }
 
     const token = sign({ id: user.id, role: user.role });
     res.json({ user, token });
   } catch (error) {
+    console.error(`❌ Error in login for ${email}:`, error);
     next(error);
   }
 };
@@ -90,7 +116,9 @@ export const login = async (req, res, next) => {
 // Forgot Password function
 export const forgotPassword = async (req, res, next) => {
   const { email } = req.body;
-
+  console.log(
+    `📝 Forgot password request: email=${email}, origin=${req.headers.origin}`
+  );
   try {
     const { rows } = await query(
       "SELECT id, name, email FROM signature_app.users WHERE lower(email) = lower($1)",
@@ -99,6 +127,7 @@ export const forgotPassword = async (req, res, next) => {
 
     const user = rows[0];
     if (!user) {
+      console.log(`❌ Email not found: ${email}`);
       return res.status(404).json({ error: "Email not found" });
     }
 
@@ -110,32 +139,46 @@ export const forgotPassword = async (req, res, next) => {
       [resetToken, expires, email]
     );
 
-    const resetLink = `${
-      process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
-    }/reset-password?token=${resetToken}`;
-    const emailText = `Hi ${user.name},\n\nYou requested a password reset for Email Signature Generator. Click the link below to reset your password (valid for 30 minutes):\n\n${resetLink}\n\nIf you didn’t request this, please ignore this email.`;
-    const emailHtmlOptions = {
-      title: "Reset Your Password",
-      greeting: `Hi ${user.name},`,
-      message:
-        "You requested a password reset. Click below to set a new password (link valid for 30 minutes).",
-      ctaText: "Reset Password",
-      ctaLink: resetLink,
-      footerText:
-        "Didn’t request this? Ignore this email or contact support@yourdomain.com.",
-    };
-    await sendEmail(
-      user.email,
-      "Reset Password - Email Signature Generator",
-      emailText,
-      emailHtmlOptions
-    );
+    console.log(`📧 Preparing to send reset email to ${user.email}`);
+    try {
+      const resetLink = `${
+        process.env.CLIENT_ORIGIN || "https://esignaturewebapp.netlify.app"
+      }/reset-password?token=${resetToken}`;
+      const emailText = `Hi ${user.name},\n\nYou requested a password reset for Email Signature Generator. Click the link below to reset your password (valid for 30 minutes):\n\n${resetLink}\n\nIf you didn’t request this, please ignore this email.`;
+      const emailHtmlOptions = {
+        title: "Reset Your Password",
+        greeting: `Hi ${user.name},`,
+        message:
+          "You requested a password reset. Click below to set a new password (link valid for 30 minutes).",
+        ctaText: "Reset Password",
+        ctaLink: resetLink,
+        footerText:
+          "Didn’t request this? Ignore this email or contact support@yourdomain.com.",
+        email: user.email,
+      };
+      await sendEmail(
+        user.email,
+        "Reset Password - Email Signature Generator",
+        emailText,
+        emailHtmlOptions
+      );
+      console.log(`✅ Reset email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error(
+        `❌ Failed to send reset email to ${user.email}:`,
+        emailError
+      );
+      return res.status(500).json({
+        error: `Reset link generated but email sending failed: ${emailError.message}`,
+      });
+    }
 
     res.status(200).json({
       message:
         "Password reset link sent to your email. Please check your spam folder if you don’t see it.",
     });
   } catch (error) {
+    console.error(`❌ Error in forgotPassword for ${email}:`, error);
     next(error);
   }
 };
@@ -143,7 +186,9 @@ export const forgotPassword = async (req, res, next) => {
 // Reset Password function
 export const resetPassword = async (req, res, next) => {
   const { token, newPassword } = req.body;
-
+  console.log(
+    `📝 Reset password request: token=${token}, origin=${req.headers.origin}`
+  );
   try {
     const { rows } = await query(
       "SELECT id, reset_token, reset_token_expiration, email, name FROM signature_app.users WHERE reset_token = $1",
@@ -152,10 +197,12 @@ export const resetPassword = async (req, res, next) => {
 
     const user = rows[0];
     if (!user) {
+      console.log(`❌ Invalid token: ${token}`);
       return res.status(400).json({ error: "Invalid token" });
     }
 
     if (Date.now() > user.reset_token_expiration) {
+      console.log(`❌ Token expired for user: ${user.email}`);
       return res.status(400).json({ error: "Token has expired" });
     }
 
@@ -165,32 +212,45 @@ export const resetPassword = async (req, res, next) => {
       [hashedPassword, user.id]
     );
 
-    const websiteUrl =
-      process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app";
-    const emailText = `Hi ${user.name},\n\nYour password for Email Signature Generator has been reset. Log in now to continue creating signatures.\n\nVisit: ${websiteUrl}/login`;
-    const emailHtmlOptions = {
-      title: "Password Reset Successful",
-      greeting: `Hi ${user.name},`,
-      message:
-        "Your password has been reset successfully. Log in with your new password to continue creating signatures.",
-      ctaText: "Log In Now",
-      ctaLink: `${websiteUrl}/login`,
-      footerText:
-        "Thank you for using Email Signature Generator! Contact support@yourdomain.com if you need help.",
-    };
-    await sendEmail(
-      user.email,
-      "Password Reset Success - Email Signature Generator",
-      emailText,
-      emailHtmlOptions
-    );
+    console.log(`📧 Preparing to send reset success email to ${user.email}`);
+    try {
+      const websiteUrl =
+        process.env.CLIENT_ORIGIN || "https://esignaturewebapp.netlify.app";
+      const emailText = `Hi ${user.name},\n\nYour password for Email Signature Generator has been reset. Log in now to continue creating signatures.\n\nVisit: ${websiteUrl}/login`;
+      const emailHtmlOptions = {
+        title: "Password Reset Successful",
+        greeting: `Hi ${user.name},`,
+        message:
+          "Your password has been reset successfully. Log in with your new password to continue creating signatures.",
+        ctaText: "Log In Now",
+        ctaLink: `${websiteUrl}/login`,
+        footerText:
+          "Thank you for using Email Signature Generator! Contact support@yourdomain.com if you need help.",
+        email: user.email,
+      };
+      await sendEmail(
+        user.email,
+        "Password Reset Success - Email Signature Generator",
+        emailText,
+        emailHtmlOptions
+      );
+      console.log(`✅ Reset success email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error(
+        `❌ Failed to send reset success email to ${user.email}:`,
+        emailError
+      );
+      return res.status(500).json({
+        error: `Password reset succeeded but email sending failed: ${emailError.message}`,
+      });
+    }
 
     res.status(200).json({
       message:
         "Password reset successfully. Check your email (and spam folder) for confirmation.",
     });
   } catch (error) {
-    console.error("Error resetting password:", error);
+    console.error(`❌ Error in resetPassword:`, error);
     next(error);
   }
 };
