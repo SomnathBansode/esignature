@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import sendgridTransport from "nodemailer-sendgrid";
 
 // Create a transporter for SMTP
 const transporter = nodemailer.createTransport({
@@ -10,6 +9,16 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify transporter connection on startup
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error("Email transporter verification failed:", error);
+  } else {
+    console.log("Email transporter is ready to send messages");
+    console.log("Using email account:", process.env.EMAIL_USER);
+  }
+});
+
 // Reusable HTML email template
 const generateEmailTemplate = ({
   title,
@@ -18,6 +27,7 @@ const generateEmailTemplate = ({
   ctaText,
   ctaLink,
   footerText,
+  email,
 }) => {
   return `
     <!DOCTYPE html>
@@ -55,7 +65,7 @@ const generateEmailTemplate = ({
         <div class="content">
           <p>${greeting}</p>
           <p>${message}</p>
-          <p style="font-size: 14px; color: #6b7280;">If you don’t see this email in your inbox, please check your spam or junk folder and add us to your contacts.</p>
+          <p style="font-size: 14px; color: #6b7280;">If you don't see this email in your inbox, please check your spam or junk folder and add us to your contacts.</p>
           ${
             ctaText && ctaLink
               ? `<a href="${ctaLink}" class="cta-button">${ctaText}</a>`
@@ -70,7 +80,7 @@ const generateEmailTemplate = ({
           <p>Email Signature Generator, 123 Business St, Tech City, TX 12345</p>
           <p><a href="${
             process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
-          }/unsubscribe?email={{email}}">Unsubscribe</a></p>
+          }/unsubscribe?email=${encodeURIComponent(email)}">Unsubscribe</a></p>
         </div>
       </div>
     </body>
@@ -78,47 +88,27 @@ const generateEmailTemplate = ({
   `;
 };
 
-// Send email function with anti-spam best practices
-// export const sendEmail = async (to, subject, text, htmlOptions) => {
-//   try {
-//     const html = generateEmailTemplate({ ...htmlOptions, email: to });
-//     await transporter.sendMail({
-//       from: `"Email Signature Generator" <${process.env.EMAIL_USER}>`,
-//       to,
-//       subject,
-//       text,
-//       html,
-//       headers: {
-//         "X-PM-Message-Stream": "outbound",
-//         "List-Unsubscribe": `<${
-//           process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
-//         }/unsubscribe?email=${encodeURIComponent(to)}>`,
-//       },
-//     });
-//     console.log(`Email sent to ${to}`);
-//   } catch (error) {
-//     console.error("Error sending email:", error);
-//     throw new Error("Email sending failed");
-//   }
-// };
-
+// Send email function with comprehensive error handling and debugging
 export const sendEmail = async (to, subject, text, htmlOptions) => {
   try {
-    console.log(`Attempting to send email to ${to} with subject: ${subject}`);
-    console.log(`Using EMAIL_USER: ${process.env.EMAIL_USER}`);
-    console.log(`HTML Options:`, htmlOptions);
+    console.log(`📧 Attempting to send email to: ${to}`);
+    console.log(`📧 Using email account: ${process.env.EMAIL_USER}`);
+    console.log(`📧 Email subject: ${subject}`);
 
-    // Verify transporter before sending
-    await transporter.verify((error, success) => {
-      if (error) {
-        console.error("Transporter verification failed:", error);
-        throw new Error("SMTP transporter verification failed");
-      } else {
-        console.log("SMTP transporter is ready");
-      }
-    });
+    // Validate required environment variables
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      throw new Error(
+        "Email credentials not configured. Check EMAIL_USER and EMAIL_PASS environment variables."
+      );
+    }
+
+    // Validate recipient email
+    if (!to || !to.includes("@")) {
+      throw new Error(`Invalid recipient email: ${to}`);
+    }
 
     const html = generateEmailTemplate({ ...htmlOptions, email: to });
+
     const mailOptions = {
       from: `"Email Signature Generator" <${process.env.EMAIL_USER}>`,
       to,
@@ -132,13 +122,75 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
         }/unsubscribe?email=${encodeURIComponent(to)}>`,
       },
     };
-    console.log("Mail options:", mailOptions);
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${to}, Message ID: ${info.messageId}`);
-    return info;
+    console.log("📧 Mail options prepared:", {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+      hasHtml: !!mailOptions.html,
+      hasText: !!mailOptions.text,
+    });
+
+    // Send the email
+    const result = await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Email sent successfully to ${to}`);
+    console.log(`✅ Message ID: ${result.messageId}`);
+    console.log(`✅ Response: ${result.response}`);
+
+    return result;
   } catch (error) {
-    console.error(`Error sending email to ${to}:`, error);
+    console.error("❌ Error sending email:", error);
+    console.error("❌ Error details:", {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      stack: error.stack,
+    });
+
+    // Check for specific common errors
+    if (error.code === "EAUTH") {
+      console.error("❌ Authentication failed. Check your email credentials.");
+    } else if (error.code === "ECONNECTION") {
+      console.error("❌ Connection failed. Check your internet connection.");
+    } else if (error.code === "EENVELOPE") {
+      console.error("❌ Invalid envelope. Check recipient email address.");
+    }
+
     throw new Error(`Email sending failed: ${error.message}`);
   }
 };
+
+// Test email function for debugging
+export const testEmail = async () => {
+  try {
+    console.log("🧪 Testing email configuration...");
+
+    const testEmail = process.env.EMAIL_USER; // Send test to yourself
+
+    const result = await sendEmail(
+      testEmail,
+      "Test Email - Email Signature Generator",
+      "This is a test email to verify your email configuration is working correctly.",
+      {
+        title: "Test Email",
+        greeting: "Hello!",
+        message:
+          "This is a test email to verify your email configuration is working correctly.",
+        ctaText: "Visit Website",
+        ctaLink:
+          process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app",
+        footerText: "Test email from Email Signature Generator",
+      }
+    );
+
+    console.log("✅ Test email sent successfully!");
+    return result;
+  } catch (error) {
+    console.error("❌ Test email failed:", error);
+    throw error;
+  }
+};
+
+// Export transporter for direct access if needed
+export { transporter };
