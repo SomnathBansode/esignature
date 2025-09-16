@@ -1,20 +1,23 @@
 import React, { useEffect } from "react";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const HomeRedirect = () => {
-  const { user, loading } = useSelector((state) => state.user);
+  const { user, isAdminMode, loading } = useSelector((state) => state.user);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        navigate(user.role === "admin" ? "/admin/dashboard" : "/dashboard", {
-          replace: true,
-        });
-      }
+    if (!loading && user && location.pathname === "/login") {
+      console.log("HomeRedirect post-login:", { user, isAdminMode });
+      navigate(
+        user.role === "admin" && isAdminMode
+          ? "/admin/dashboard"
+          : "/dashboard",
+        { replace: true }
+      );
     }
-  }, [user, loading, navigate]);
+  }, [user, isAdminMode, loading, navigate, location.pathname]);
 
   if (loading) {
     return (
@@ -24,7 +27,6 @@ const HomeRedirect = () => {
     );
   }
 
-  // If no user, show normal home content
   return null;
 };
 

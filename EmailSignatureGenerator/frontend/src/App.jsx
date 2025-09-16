@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { fetchProfile } from "./redux/slices/userSlice";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchProfile, setAdminMode } from "./redux/slices/userSlice";
 import { Toaster } from "react-hot-toast";
 
 import Navbar from "./components/Navbar.jsx";
@@ -21,11 +21,27 @@ import UnsubscribePage from "./pages/UnsubscribePage.jsx";
 
 function App() {
   const dispatch = useDispatch();
+  const location = useLocation();
+  const { user, loading, isAdminMode } = useSelector((state) => state.user);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) dispatch(fetchProfile());
+    if (token) {
+      dispatch(fetchProfile());
+    } else {
+      dispatch({ type: "user/logout" });
+    }
   }, [dispatch]);
+
+  useEffect(() => {
+    if (user?.role === "admin" && !loading) {
+      if (location.pathname === "/admin/dashboard" && !isAdminMode) {
+        dispatch(setAdminMode(true));
+      } else if (location.pathname === "/dashboard" && isAdminMode) {
+        dispatch(setAdminMode(false));
+      }
+    }
+  }, [user, loading, location.pathname, isAdminMode, dispatch]);
 
   return (
     <>

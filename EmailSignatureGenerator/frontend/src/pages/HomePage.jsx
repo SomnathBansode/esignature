@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 
 const HomePage = () => {
-  const { user, loading } = useSelector((state) => state.user);
+  const { user, isAdminMode, loading } = useSelector((state) => state.user);
   const navigate = useNavigate();
 
   if (loading) {
@@ -15,7 +15,7 @@ const HomePage = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-8">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-r from-blue-100 to-purple-100">
       <h1 className="text-5xl font-bold text-blue-700">
         Welcome to Email Signature App
       </h1>
@@ -28,7 +28,10 @@ const HomePage = () => {
           <button
             onClick={() =>
               navigate(
-                user.role === "admin" ? "/admin/dashboard" : "/dashboard"
+                user.role === "admin" && isAdminMode
+                  ? "/admin/dashboard"
+                  : "/dashboard",
+                { replace: true }
               )
             }
             className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
@@ -38,13 +41,13 @@ const HomePage = () => {
         ) : (
           <>
             <button
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/login", { replace: true })}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
               Login
             </button>
             <button
-              onClick={() => navigate("/register")}
+              onClick={() => navigate("/register", { replace: true })}
               className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
             >
               Register

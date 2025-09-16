@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
 import { loginUser, clearMessages } from "../redux/slices/userSlice";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { ClipLoader } from "react-spinners";
 import toast from "react-hot-toast";
@@ -11,7 +11,10 @@ import gsap from "gsap";
 const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, loading, error } = useSelector((state) => state.user);
+  const location = useLocation();
+  const { user, isAdminMode, loading, error } = useSelector(
+    (state) => state.user
+  );
   const [showPassword, setShowPassword] = React.useState(false);
   const formRef = useRef(null);
   const animatedRef = useRef(false);
@@ -25,11 +28,13 @@ const LoginPage = () => {
 
   useEffect(() => {
     dispatch(clearMessages());
-    if (user && !loading) {
-      console.log("User exists, redirecting:", user);
-      if (user.role === "admin")
-        navigate("/admin/dashboard", { replace: true });
-      else navigate("/dashboard", { replace: true });
+    if (user && !loading && location.pathname === "/login") {
+      console.log("LoginPage redirect:", { user, isAdminMode });
+      const redirectPath =
+        user.role === "admin" && isAdminMode
+          ? "/admin/dashboard"
+          : "/dashboard";
+      navigate(redirectPath, { replace: true });
     }
 
     if (formRef.current && !animatedRef.current) {
@@ -42,39 +47,27 @@ const LoginPage = () => {
           y: 0,
           duration: 0.8,
           ease: "power3.out",
-          onComplete: () => {
-            if (formRef.current) formRef.current.style.opacity = "1";
-          },
         }
       );
     }
-  }, [user, navigate, dispatch, loading]);
+  }, [user, isAdminMode, navigate, dispatch, loading, location.pathname]);
 
   const onSubmit = async (data) => {
-    console.log("Submitting login for email:", data.email);
     try {
-      const promise = dispatch(
-        loginUser({ email: data.email, password: data.password })
-      ).unwrap();
-      await toast.promise(
-        promise,
-        {
-          loading: "Logging in...",
-          success: "Login successful! Welcome back!",
-          error: (err) => err || "Invalid credentials",
-        },
-        { duration: 4000 }
+      const result = await dispatch(loginUser(data)).unwrap();
+      const redirectPath =
+        result.role === "admin" && isAdminMode
+          ? "/admin/dashboard"
+          : "/dashboard";
+      navigate(redirectPath, { replace: true });
+      toast.success("Logged in successfully!");
+      reset();
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error(
+        error.message ||
+          "Login failed. Please check your connection or credentials."
       );
-      reset(); // Clear form after success
-      console.log("Toast completed, redirecting to dashboard");
-      setTimeout(() => {
-        dispatch(clearMessages());
-        if (user && user.role === "admin")
-          navigate("/admin/dashboard", { replace: true });
-        else navigate("/dashboard", { replace: true });
-      }, 4000);
-    } catch (err) {
-      console.error("Login error:", err);
     }
   };
 
@@ -83,7 +76,6 @@ const LoginPage = () => {
       <div
         ref={formRef}
         className="max-w-md w-full mx-auto p-8 bg-white rounded-xl shadow-lg border border-gray-200"
-        style={{ opacity: 1 }}
       >
         <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Login
@@ -154,7 +146,7 @@ const LoginPage = () => {
         <div className="mt-6 text-center space-y-2 text-gray-600">
           <p>
             <span
-              onClick={() => navigate("/forgot-password")}
+              onClick={() => navigate("/forgot-password", { replace: true })}
               className="text-blue-600 hover:underline cursor-pointer font-medium"
             >
               Forgot Password?
@@ -163,7 +155,7 @@ const LoginPage = () => {
           <p>
             Don't have an account?{" "}
             <span
-              onClick={() => navigate("/register")}
+              onClick={() => navigate("/register", { replace: true })}
               className="text-blue-600 hover:underline cursor-pointer font-medium"
             >
               Register here

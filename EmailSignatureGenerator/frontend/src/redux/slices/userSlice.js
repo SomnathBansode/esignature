@@ -19,8 +19,10 @@ export const fetchProfile = createAsyncThunk(
       return res.data;
     } catch (err) {
       console.error("fetchProfile error:", err);
+      localStorage.removeItem("token");
       return rejectWithValue(
-        err.response?.data?.error || "Failed to fetch profile"
+        err.response?.data?.error ||
+          "Failed to fetch profile. Please check your connection."
       );
     }
   }
@@ -38,10 +40,18 @@ export const register = createAsyncThunk(
       });
       const { token, user } = res.data;
       localStorage.setItem("token", token);
+      if (user.role === "admin") {
+        const savedMode = localStorage.getItem("isAdminMode");
+        localStorage.setItem(
+          "isAdminMode",
+          savedMode !== null ? savedMode : "true"
+        );
+      }
       return user;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Registration failed"
+        err.response?.data?.error ||
+          "Registration failed. Please check your connection."
       );
     }
   }
@@ -58,10 +68,18 @@ export const loginUser = createAsyncThunk(
       });
       const { token, user } = res.data;
       localStorage.setItem("token", token);
+      if (user.role === "admin") {
+        const savedMode = localStorage.getItem("isAdminMode");
+        localStorage.setItem(
+          "isAdminMode",
+          savedMode !== null ? savedMode : "true"
+        );
+      }
       return user;
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Invalid credentials"
+        err.response?.data?.error ||
+          "Invalid credentials or server unreachable."
       );
     }
   }
@@ -78,7 +96,7 @@ export const forgotPassword = createAsyncThunk(
       return res.data.message || "Password reset link sent to your email!";
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Failed to send reset link"
+        err.response?.data?.error || "Failed to send reset link."
       );
     }
   }
@@ -96,7 +114,7 @@ export const resetPassword = createAsyncThunk(
       return res.data.message || "Password reset successfully!";
     } catch (err) {
       return rejectWithValue(
-        err.response?.data?.error || "Failed to reset password"
+        err.response?.data?.error || "Failed to reset password."
       );
     }
   }
@@ -110,6 +128,9 @@ const userSlice = createSlice({
     loading: false,
     error: null,
     successMessage: null,
+    isAdminMode: localStorage.getItem("isAdminMode")
+      ? JSON.parse(localStorage.getItem("isAdminMode"))
+      : true,
   },
   reducers: {
     logout: (state) => {
@@ -117,11 +138,26 @@ const userSlice = createSlice({
       state.user = null;
       state.error = null;
       state.successMessage = null;
+      state.isAdminMode = true;
+      state.loading = false;
       localStorage.removeItem("token");
+      localStorage.removeItem("isAdminMode");
     },
     clearMessages: (state) => {
       state.error = null;
       state.successMessage = null;
+    },
+    toggleAdminMode: (state) => {
+      if (state.user?.role === "admin") {
+        state.isAdminMode = !state.isAdminMode;
+        localStorage.setItem("isAdminMode", JSON.stringify(state.isAdminMode));
+      }
+    },
+    setAdminMode: (state, action) => {
+      if (state.user?.role === "admin") {
+        state.isAdminMode = action.payload;
+        localStorage.setItem("isAdminMode", JSON.stringify(action.payload));
+      }
     },
   },
   extraReducers: (builder) => {
@@ -140,6 +176,8 @@ const userSlice = createSlice({
         state.user = null;
         state.token = null;
         state.loading = false;
+        state.isAdminMode = true;
+        localStorage.removeItem("isAdminMode");
         localStorage.removeItem("token");
       })
       .addCase(register.pending, (state) => {
@@ -150,6 +188,10 @@ const userSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.user = action.payload;
         state.token = localStorage.getItem("token");
+        state.isAdminMode =
+          action.payload.role === "admin"
+            ? JSON.parse(localStorage.getItem("isAdminMode")) ?? true
+            : false;
         state.loading = false;
         state.successMessage = "Registration successful! Welcome!";
       })
@@ -165,6 +207,10 @@ const userSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.user = action.payload;
         state.token = localStorage.getItem("token");
+        state.isAdminMode =
+          action.payload.role === "admin"
+            ? JSON.parse(localStorage.getItem("isAdminMode")) ?? true
+            : false;
         state.loading = false;
         state.successMessage = "Login successful! Welcome back!";
       })
@@ -201,5 +247,6 @@ const userSlice = createSlice({
   },
 });
 
-export const { logout, clearMessages } = userSlice.actions;
+export const { logout, clearMessages, toggleAdminMode, setAdminMode } =
+  userSlice.actions;
 export default userSlice.reducer;

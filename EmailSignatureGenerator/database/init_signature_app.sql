@@ -354,3 +354,93 @@ ADD COLUMN IF NOT EXISTS reset_token_expiration BIGINT;
 
 ALTER TABLE signature_app.users
 ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN DEFAULT TRUE;
+
+
+
+
+
+
+
+
+
+-- Add html column to templates table if it doesn't exist
+ALTER TABLE signature_app.templates
+ADD COLUMN IF NOT EXISTS html TEXT;
+
+-- Create or replace the add_template function with p_created_by as UUID
+CREATE OR REPLACE FUNCTION signature_app.add_template(
+  p_name TEXT,
+  p_thumbnail TEXT,
+  p_tokens JSONB,
+  p_html TEXT,
+  p_created_by UUID
+) RETURNS signature_app.templates AS $$
+  INSERT INTO signature_app.templates (name, thumbnail, tokens, html, created_by)
+  VALUES (p_name, p_thumbnail, p_tokens, p_html, p_created_by)
+  RETURNING *;
+$$ LANGUAGE SQL;
+
+-- Create or replace the update_template function (unchanged from previous fix)
+CREATE OR REPLACE FUNCTION signature_app.update_template(
+  p_id UUID,
+  p_name TEXT,
+  p_thumbnail TEXT,
+  p_tokens JSONB,
+  p_html TEXT
+) RETURNS signature_app.templates AS $$
+  UPDATE signature_app.templates
+  SET name = p_name, thumbnail = p_thumbnail, tokens = p_tokens, html = p_html, created_at = NOW()
+  WHERE id = p_id
+  RETURNING *;
+$$ LANGUAGE SQL;
+
+select * from signature_app.templates;
+
+SELECT id, name, thumbnail, tokens, html, created_by, created_at
+FROM signature_app.templates;
+
+desc signature_app.templates;
+
+UPDATE signature_app.templates
+SET html = '<div style="font-family: {{font}}; color: {{accent}};">{{name}} - {{title}}</div>'
+WHERE html IS NULL;
+
+
+UPDATE signature_app.templates
+SET tokens = '["name", "title"]'::jsonb
+WHERE tokens->>'font' IS NOT NULL;
+
+ALTER TABLE signature_app.templates
+ADD COLUMN IF NOT EXISTS placeholders JSONB;
+
+UPDATE signature_app.templates
+SET placeholders = '["name", "title"]'::jsonb
+WHERE placeholders IS NULL;
+
+CREATE OR REPLACE FUNCTION signature_app.add_template(
+  p_name TEXT,
+  p_thumbnail TEXT,
+  p_tokens JSONB,
+  p_html TEXT,
+  p_placeholders JSONB,
+  p_created_by UUID
+) RETURNS signature_app.templates AS $$
+  INSERT INTO signature_app.templates (name, thumbnail, tokens, html, placeholders, created_by)
+  VALUES (p_name, p_thumbnail, p_tokens, p_html, p_placeholders, p_created_by)
+  RETURNING *;
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION signature_app.update_template(
+  p_id UUID,
+  p_name TEXT,
+  p_thumbnail TEXT,
+  p_tokens JSONB,
+  p_html TEXT,
+  p_placeholders JSONB
+) RETURNS signature_app.templates AS $$
+  UPDATE signature_app.templates
+  SET name = p_name, thumbnail = p_thumbnail, tokens = p_tokens, html = p_html, placeholders = p_placeholders, created_at = NOW()
+  WHERE id = p_id
+  RETURNING *;
+$$ LANGUAGE SQL;
+
