@@ -1,0 +1,7 @@
+[build]
+  base = "EmailSignatureGenerator/frontend"
+  command = "npm run build"
+  publish = "EmailSignatureGenerator/frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
