@@ -1,21 +1,15 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import { http } from "../../api/http";
 
-const API_URL = import.meta.env.VITE_API_URL;
 const tokenFromStorage = localStorage.getItem("token") || null;
 
-// Fetch user profile
 export const fetchProfile = createAsyncThunk(
   "user/fetchProfile",
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
-
-      const res = await axios.get(`${API_URL}/api/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      if (!token) return rejectWithValue("No token");
+      const res = await http.get(`/api/users/profile`);
       return res.data;
     } catch (err) {
       console.error("fetchProfile error:", err);
@@ -28,12 +22,11 @@ export const fetchProfile = createAsyncThunk(
   }
 );
 
-// Register user
 export const register = createAsyncThunk(
   "user/register",
   async ({ name, email, password }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/register`, {
+      const res = await http.post(`/api/auth/register`, {
         name,
         email,
         password,
@@ -57,15 +50,11 @@ export const register = createAsyncThunk(
   }
 );
 
-// Login user
 export const loginUser = createAsyncThunk(
   "user/loginUser",
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/login`, {
-        email,
-        password,
-      });
+      const res = await http.post(`/api/auth/login`, { email, password });
       const { token, user } = res.data;
       localStorage.setItem("token", token);
       if (user.role === "admin") {
@@ -85,14 +74,11 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-// Forgot password
 export const forgotPassword = createAsyncThunk(
   "user/forgotPassword",
   async ({ email }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/forgot-password`, {
-        email,
-      });
+      const res = await http.post(`/api/auth/forgot-password`, { email });
       return res.data.message || "Password reset link sent to your email!";
     } catch (err) {
       return rejectWithValue(
@@ -102,12 +88,11 @@ export const forgotPassword = createAsyncThunk(
   }
 );
 
-// Reset password
 export const resetPassword = createAsyncThunk(
   "user/resetPassword",
   async ({ token, newPassword }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/reset-password`, {
+      const res = await http.post(`/api/auth/reset-password`, {
         token,
         newPassword,
       });

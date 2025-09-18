@@ -1,4 +1,3 @@
-// src/pages/TemplatesPage.jsx
 import React from "react";
 
 const TemplatesPage = () => {

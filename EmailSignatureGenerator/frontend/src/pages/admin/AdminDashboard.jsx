@@ -1,107 +1,94 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import axios from "axios";
-import toast from "react-hot-toast";
+// frontend/src/pages/admin/AdminDashboard.jsx
+import React, { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import {
+  FiLayers,
+  FiEdit3,
+  FiUsers,
+  FiList,
+  FiChevronRight,
+} from "react-icons/fi";
 
-function AdminDashboard() {
-  const [stats, setStats] = useState(null);
-  const { token } = useSelector((state) => state.user);
+const AdminDashboard = () => {
+  const { user } = useSelector((s) => s.user);
+  const navigate = useNavigate();
 
+  // Gate: only admins
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/admin/stats`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setStats(response.data);
-        console.log("Dashboard refreshed!", response.data);
-      } catch (error) {
-        console.error(
-          "Failed to fetch stats:",
-          error.response?.data?.error || error.message
-        );
-        toast.error("Failed to load dashboard stats");
-        setStats({
-          total_users: 0,
-          total_signatures: 0,
-          popular_templates: [],
-          recent_activity: [],
-        });
-      }
-    };
-    fetchStats();
-  }, [token]);
+    if (!user || user.role !== "admin") {
+      navigate("/login", { replace: true });
+    }
+  }, [user, navigate]);
 
-  return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          Admin Dashboard
-        </h1>
-        {stats ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Total Users
-              </h2>
-              <p className="text-2xl text-blue-600">{stats.total_users}</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Total Signatures
-              </h2>
-              <p className="text-2xl text-blue-600">{stats.total_signatures}</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Popular Templates
-              </h2>
-              <ul className="mt-4 space-y-2">
-                {stats.popular_templates.map((template) => (
-                  <li key={template.id} className="text-gray-600">
-                    {template.name}: {template.uses} uses
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md col-span-1 md:col-span-2 lg:col-span-3">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Recent Activity
-              </h2>
-              <ul className="mt-4 space-y-2">
-                {stats.recent_activity.map((activity, index) => (
-                  <li key={index} className="text-gray-600">
-                    {activity.description} at{" "}
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </li>
-                ))}
-              </ul>
-            </div>
+  const Card = ({ to, icon: Icon, title, desc, cta = "Open" }) => (
+    <Link
+      to={to}
+      className="group rounded-2xl border bg-white shadow-sm hover:shadow-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <div className="p-6 sm:p-8 min-h-[180px] flex flex-col justify-between">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-blue-100">
+            <Icon className="text-blue-600" size={28} />
           </div>
-        ) : (
-          <p className="text-gray-600">Loading stats...</p>
-        )}
-        <div className="mt-6 flex space-x-4">
-          <Link
-            to="/admin/users"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Manage Users
-          </Link>
-          <Link
-            to="/admin/templates"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Manage Templates
-          </Link>
+          <div>
+            <h3 className="text-lg sm:text-xl font-semibold">{title}</h3>
+            <p className="mt-1 text-gray-600 text-sm sm:text-base">{desc}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center justify-between">
+          <span className="inline-flex items-center text-blue-700 group-hover:text-blue-800 font-medium">
+            {cta}
+            <FiChevronRight className="ml-1" />
+          </span>
+          <div className="hidden sm:block h-2 w-2 rounded-full bg-blue-200 group-hover:bg-blue-300" />
         </div>
       </div>
+    </Link>
+  );
+
+  return (
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto">
+      <header className="mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold">Admin</h1>
+        <p className="text-gray-600 mt-1">
+          Quick links to manage templates, build new layouts, and oversee users.
+        </p>
+      </header>
+
+      <section className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <Card
+          to="/admin/templates"
+          icon={FiLayers}
+          title="Manage Templates"
+          desc="Browse all templates, edit HTML, update placeholders, or delete."
+          cta="Open templates"
+        />
+        <Card
+          to="/admin/templates/builder"
+          icon={FiEdit3}
+          title="Template Builder"
+          desc="Design new signatures visually. Export production-safe HTML."
+          cta="Open builder"
+        />
+        <Card
+          to="/admin/users"
+          icon={FiUsers}
+          title="Manage Users"
+          desc="Search users, suspend/activate accounts, and set roles."
+          cta="Open users"
+        />
+        <Card
+          to="/signatures"
+          icon={FiList}
+          title="My Signatures"
+          desc="See your saved signatures. Copy HTML or download assets."
+          cta="Open signatures"
+        />
+      </section>
     </div>
   );
-}
+};
 
 export default AdminDashboard;

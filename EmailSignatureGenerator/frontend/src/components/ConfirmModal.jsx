@@ -1,35 +1,67 @@
-import React from "react";
+import React, { useEffect } from "react";
 
-const ConfirmModal = ({ isOpen, onClose, onConfirm, message }) => {
-  if (!isOpen) return null;
+export default function ConfirmModal({
+  isOpen,
+  open,
+  title = "Are you sure?",
+  body,
+  message,
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  onConfirm,
+  onClose,
+  loading = false,
+}) {
+  const visible = typeof isOpen === "boolean" ? isOpen : !!open;
+  const text = body || message || "";
+
+  useEffect(() => {
+    const onEsc = (e) => e.key === "Escape" && visible && onClose?.();
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [visible, onClose]);
+
+  if (!visible) return null;
+
+  const handleConfirm = async () => {
+    try {
+      await Promise.resolve(onConfirm?.());
+    } finally {
+      onClose?.(); // auto-close after confirm
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Confirm Action
-        </h3>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex justify-end gap-4">
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+        <div className="border-b px-5 py-4">
+          <h3 className="text-lg font-semibold">{title}</h3>
+        </div>
+        {text && <div className="px-5 py-4 text-gray-700">{text}</div>}
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+            className="rounded border px-4 py-2 hover:bg-gray-50"
+            disabled={loading}
           >
-            Cancel
+            {cancelText}
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+            onClick={handleConfirm}
+            className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-60"
+            disabled={loading}
           >
-            Confirm
+            {loading ? "Please wait…" : confirmText}
           </button>
         </div>
       </div>
     </div>
   );
-};
-
-export default ConfirmModal;
+}

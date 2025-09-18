@@ -1,10 +1,12 @@
-import React, { useEffect } from "react";
+// frontend/src/App.jsx
+import React, { useEffect, useRef } from "react";
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProfile, setAdminMode, logout } from "./redux/slices/userSlice";
 import axios from "axios";
 import { Toaster } from "react-hot-toast";
-
+import UnsubscribePage from "@/pages/UnsubscribePage.jsx";
+import { fetchProfile, setAdminMode, logout } from "./redux/slices/userSlice";
+import TemplateListPage from "@/pages/TemplateListPage.jsx";
 import Navbar from "./components/Navbar.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import PublicRoute from "./components/PublicRoute.jsx";
@@ -19,65 +21,118 @@ import Dashboard from "./pages/user/Dashboard.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import AdminUsers from "./pages/admin/AdminUsers.jsx";
 import AdminTemplates from "./pages/admin/AdminTemplates.jsx";
-import NotFound from "./pages/NotFound.jsx";
+import AdminTemplateBuilder from "./pages/admin/AdminTemplateBuilder.jsx";
 import SignatureListPage from "./pages/SignatureListPage.jsx";
-import UnsubscribePage from "./pages/UnsubscribePage.jsx";
+import SignatureCreationPage from "./pages/SignatureCreationPage.jsx";
+import SignatureEditPage from "./pages/SignatureEditPage.jsx";
+import NotFound from "./pages/NotFound.jsx";
 
 function App() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, isAdminMode, token } = useSelector(
-    (state) => state.user
-  );
+
+  const { user, loading, isAdminMode, token } = useSelector((s) => s.user);
+
+  // ----- axios one-time setup + global interceptors -----
+  const reqIdRef = useRef(null);
+  const resIdRef = useRef(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      dispatch(fetchProfile());
-    } else {
-      dispatch(logout());
+    axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+    axios.defaults.withCredentials = false;
+
+    // eject old interceptors (HMR/StrictMode safe)
+    if (reqIdRef.current !== null) {
+      axios.interceptors.request.eject(reqIdRef.current);
+      reqIdRef.current = null;
     }
-  }, [dispatch]);
+    if (resIdRef.current !== null) {
+      axios.interceptors.response.eject(resIdRef.current);
+      resIdRef.current = null;
+    }
 
-  useEffect(() => {
-    if (!loading && user?.role === "admin") {
-      if (location.pathname.startsWith("/admin/") && !isAdminMode) {
-        dispatch(setAdminMode(true));
-        axios
-          .post(
-            `${import.meta.env.VITE_API_URL}/api/admin/log-admin-mode`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          .catch((err) =>
-            console.error("Failed to log admin mode switch:", err)
-          );
-      } else if (location.pathname === "/dashboard" && isAdminMode) {
-        dispatch(setAdminMode(false));
+    // attach auth header
+    reqIdRef.current = axios.interceptors.request.use((config) => {
+      const t = localStorage.getItem("token");
+      if (t && !config.headers?.Authorization) {
+        config.headers = { ...config.headers, Authorization: `Bearer ${t}` };
       }
-    }
-  }, [user, loading, location.pathname, isAdminMode, dispatch, token]);
+      return config;
+    });
 
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
+    // handle 401/403 globally
+    resIdRef.current = axios.interceptors.response.use(
+      (res) => res,
       (error) => {
-        if (
-          error.response?.status === 403 &&
-          error.response?.data?.error === "Account is suspended"
-        ) {
+        const status = error?.response?.status;
+        const msg = error?.response?.data?.error || error.message;
+
+        if (status === 401) {
           dispatch(logout());
-          localStorage.removeItem("token");
           navigate("/login", {
+            replace: true,
+            state: { error: msg || "Session expired. Please log in again." },
+          });
+        } else if (status === 403 && msg === "Account is suspended") {
+          dispatch(logout());
+          navigate("/login", {
+            replace: true,
             state: { error: "Your account has been suspended" },
           });
         }
         return Promise.reject(error);
       }
     );
-    return () => axios.interceptors.response.eject(interceptor);
+
+    return () => {
+      if (reqIdRef.current !== null) {
+        axios.interceptors.request.eject(reqIdRef.current);
+        reqIdRef.current = null;
+      }
+      if (resIdRef.current !== null) {
+        axios.interceptors.response.eject(resIdRef.current);
+        resIdRef.current = null;
+      }
+    };
   }, [dispatch, navigate]);
+
+  // ----- boot: fetch profile if we have a token -----
+  useEffect(() => {
+    const tokenStored = localStorage.getItem("token");
+    if (tokenStored && !user && !loading) {
+      dispatch(fetchProfile());
+    }
+    if (!tokenStored) {
+      dispatch(logout());
+      if (
+        location.pathname.startsWith("/admin") ||
+        location.pathname === "/dashboard" ||
+        location.pathname.startsWith("/signatures")
+      ) {
+        navigate("/login", { replace: true });
+      }
+    }
+  }, [dispatch, loading, user, location.pathname, navigate]);
+
+  // ----- admin-mode auto toggle -----
+  useEffect(() => {
+    if (!loading && user?.role === "admin") {
+      const onAdmin = location.pathname.startsWith("/admin/");
+      if (onAdmin && !isAdminMode) {
+        dispatch(setAdminMode(true));
+        axios
+          .post(
+            `/api/admin/log-admin-mode`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          .catch(() => {});
+      } else if (location.pathname === "/dashboard" && isAdminMode) {
+        dispatch(setAdminMode(false));
+      }
+    }
+  }, [user, loading, location.pathname, isAdminMode, dispatch, token]);
 
   return (
     <>
@@ -110,9 +165,12 @@ function App() {
           },
         }}
       />
+
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/redirect" element={<HomeRedirect />} />
+
+        {/* public */}
         <Route
           path="/login"
           element={
@@ -153,6 +211,8 @@ function App() {
             </PublicRoute>
           }
         />
+
+        {/* user */}
         <Route
           path="/dashboard"
           element={
@@ -161,6 +221,8 @@ function App() {
             </PrivateRoute>
           }
         />
+
+        {/* admin */}
         <Route
           path="/admin/dashboard"
           element={
@@ -186,6 +248,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/templates/builder"
+          element={
+            <PrivateRoute adminOnly={true}>
+              <AdminTemplateBuilder />
+            </PrivateRoute>
+          }
+        />
+
+        {/* signatures */}
+        <Route
           path="/signatures"
           element={
             <PrivateRoute>
@@ -193,6 +265,25 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/signatures/create"
+          element={
+            <PrivateRoute>
+              <SignatureCreationPage />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/unsubscribe" element={<UnsubscribePage />} />
+        <Route path="/templates" element={<TemplateListPage />} />
+        <Route
+          path="/signatures/edit/:id"
+          element={
+            <PrivateRoute>
+              <SignatureEditPage />
+            </PrivateRoute>
+          }
+        />
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

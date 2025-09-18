@@ -1,6 +1,6 @@
-// backend/routes/templateRoutes.js
 import { Router } from "express";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import relaxedHtmlGuard from "../middleware/relaxedHtmlGuard.js";
 import {
   getTemplates,
   getTemplateById,
@@ -11,9 +11,13 @@ import {
 
 const router = Router();
 
-router.get("/", getTemplates); // Fetch all templates
-router.post("/", protect, adminOnly, addTemplate); // Admin: Add new template
-router.put("/:id", protect, adminOnly, updateTemplate); // Admin: Update a template
-router.delete("/:id", protect, adminOnly, deleteTemplate); // Admin: Delete a template
+// Public reads
+router.get("/", getTemplates);
 router.get("/:id", getTemplateById);
+
+// Admin writes
+router.post("/", protect, adminOnly, relaxedHtmlGuard, addTemplate);
+router.put("/:id", protect, adminOnly, relaxedHtmlGuard, updateTemplate);
+router.delete("/:id", protect, adminOnly, deleteTemplate);
+
 export default router;

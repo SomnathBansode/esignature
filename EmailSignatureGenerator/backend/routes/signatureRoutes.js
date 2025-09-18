@@ -8,14 +8,18 @@ import {
   deleteSignature,
   getSignatureById,
 } from "../controllers/signatureController.js";
+import { sanitizeSignatureHtml } from "../middleware/sanitizeSignatureHtml.js";
+import { cleanSignatureResponse } from "../middleware/cleanSignatureResponse.js";
 
 const router = Router();
 
-// User routes
-router.get("/", protect, mySignatures); // Get all user signatures
-router.get("/:id", protect, getSignatureById); // Get signature by ID
-router.post("/", protect, createSignature); // Create signature
-router.put("/:id", protect, updateSignature); // Update signature
-router.delete("/:id", protect, deleteSignature); // Delete signature
+// READ (clean on the way out so legacy rows stop causing console CSS errors)
+router.get("/", protect, cleanSignatureResponse, mySignatures);
+router.get("/:id", protect, cleanSignatureResponse, getSignatureById);
+
+// WRITE (clean on the way in so DB always stays clean)
+router.post("/", protect, sanitizeSignatureHtml, createSignature);
+router.put("/:id", protect, sanitizeSignatureHtml, updateSignature);
+router.delete("/:id", protect, deleteSignature);
 
 export default router;

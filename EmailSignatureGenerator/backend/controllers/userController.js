@@ -21,8 +21,12 @@ export const updateUser = async (req, res, next) => {
     if (!id) {
       throw new Error("User ID is missing in request parameters");
     }
-    const adminId = req.user?.id || null;
-    await query(`SET LOCAL app.current_user_id TO '${adminId || ""}'`);
+    const adminId = req.user?.id || "";
+    // safer than string interpolation; sets GUC for audit trigger
+    await query("SELECT set_config('app.current_user_id', $1, true)", [
+      adminId,
+    ]);
+
     const { rows } = await query(
       "UPDATE signature_app.users SET is_active = $1 WHERE id = $2 RETURNING id, name, email, role, is_active",
       [is_active, id]
@@ -30,6 +34,7 @@ export const updateUser = async (req, res, next) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
+
     if (!is_active) {
       console.log(`Attempting to blacklist token for user ${id}`);
       try {
@@ -54,14 +59,15 @@ export const updateUser = async (req, res, next) => {
           `Failed to blacklist token for user ${id}:`,
           blacklistError
         );
-        // Continue to allow suspension
       }
     }
+
     res.json(rows[0]);
   } catch (e) {
     console.error(`Error in updateUser for ${req.params.id}:`, e);
     next(e);
   } finally {
+    // reset the GUC regardless of outcome
     await query("RESET app.current_user_id");
   }
 };
@@ -73,8 +79,11 @@ export const deleteUser = async (req, res, next) => {
     if (!id) {
       throw new Error("User ID is missing in request parameters");
     }
-    const adminId = req.user?.id || null;
-    await query(`SET LOCAL app.current_user_id TO '${adminId || ""}'`);
+    const adminId = req.user?.id || "";
+    await query("SELECT set_config('app.current_user_id', $1, true)", [
+      adminId,
+    ]);
+
     const { rows: userRows } = await query(
       "SELECT email FROM signature_app.users WHERE id = $1",
       [id]
@@ -82,6 +91,7 @@ export const deleteUser = async (req, res, next) => {
     if (userRows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
+
     await query("DELETE FROM signature_app.users WHERE id = $1", [id]);
     res.json({ message: "User deleted successfully" });
   } catch (e) {

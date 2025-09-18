@@ -8,6 +8,7 @@ import { checkConnection } from "./config/db.js";
 import pool from "./config/db.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import proxyRoutes from "./routes/proxy.js";
 import { testEmail } from "./utils/mailer.js";
 
 const app = express();
@@ -33,7 +34,7 @@ app.use(
   })
 );
 
-// Test email route for debugging email issues
+// Test email route (debug)
 app.get("/test-email", async (req, res) => {
   console.log(`🚀 Test email request, origin=${req.headers.origin}`);
   try {
@@ -45,7 +46,7 @@ app.get("/test-email", async (req, res) => {
   }
 });
 
-// Health check routes
+// Health checks
 app.get("/health", async (_req, res) => {
   const dbOk = await checkConnection();
   res.json({ status: "ok", db: dbOk ? "connected" : "error" });
@@ -65,6 +66,7 @@ app.use("/api/templates", templateRoutes);
 app.use("/api/signatures", signatureRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/proxy", proxyRoutes); // <-- single proxy mount (no duplicate inline handler)
 
 // Basic error handler
 app.use((err, _req, res, _next) => {

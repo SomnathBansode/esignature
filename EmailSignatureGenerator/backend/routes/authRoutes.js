@@ -1,4 +1,5 @@
 import express from "express";
+import { query } from "../config/db.js";
 import {
   register,
   login,
@@ -12,6 +13,7 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
+
 router.post("/unsubscribe", async (req, res, next) => {
   const { email } = req.body;
   try {

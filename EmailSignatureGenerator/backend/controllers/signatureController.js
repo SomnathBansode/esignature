@@ -13,6 +13,7 @@ export const createSignature = async (req, res, next) => {
     next(e);
   }
 };
+
 export const mySignatures = async (req, res, next) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -62,6 +63,7 @@ export const updateSignature = async (req, res, next) => {
     next(e);
   }
 };
+
 export const deleteSignature = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -71,11 +73,12 @@ export const deleteSignature = async (req, res, next) => {
     next(e);
   }
 };
+
 export const getSignatureById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { rows } = await query(
-      "SELECT * FROM signature_app.get_user_signatures($1) WHERE id = $2",
+      "SELECT * FROM signature_app.get_user_signatures($1) s WHERE s.id = $2",
       [req.user.id, id]
     );
 
@@ -88,6 +91,7 @@ export const getSignatureById = async (req, res, next) => {
     next(e);
   }
 };
+
 export const getUserSignatures = async (req, res, next) => {
   try {
     const user_id = req.user.id;

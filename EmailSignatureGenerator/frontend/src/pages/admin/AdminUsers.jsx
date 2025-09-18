@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -11,7 +11,7 @@ const AdminUsers = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalAction, setModalAction] = useState(null);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const { data } = await axios.get(
         `${import.meta.env.VITE_API_URL}/api/admin/users`,
@@ -23,11 +23,11 @@ const AdminUsers = () => {
     } catch (error) {
       toast.error("Failed to fetch users: " + error.message);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   const handleSuspendUser = async (user) => {
     try {
