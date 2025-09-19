@@ -2,8 +2,20 @@ import React, { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { logout, toggleAdminMode } from "../redux/slices/userSlice";
+import { useSpring, animated } from "@react-spring/web";
 import toast from "react-hot-toast";
-import ConfirmModal from "./ConfirmModal.jsx";
+import {
+  Bars3Icon,
+  XMarkIcon,
+  ArrowRightStartOnRectangleIcon,
+  ArrowLeftEndOnRectangleIcon,
+  HomeIcon,
+  UserCircleIcon,
+  ShieldCheckIcon,
+  KeyIcon,
+  SparklesIcon, // For a modern logo feel
+} from "@heroicons/react/24/outline";
+import ConfirmModal from "./ConfirmModal.jsx"; // Assuming this component exists
 
 const Navbar = () => {
   const { user, isAdminMode } = useSelector((state) => state.user);
@@ -11,9 +23,24 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState(null);
-
-  // NEW: mobile hamburger state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Animation for mobile menu
+  const menuAnimation = useSpring({
+    maxHeight: isMenuOpen ? 500 : 0, // Adjust maxHeight as needed
+    opacity: isMenuOpen ? 1 : 0,
+    from: { opacity: 0, maxHeight: 0 },
+    config: { tension: 250, friction: 25 },
+    delay: isMenuOpen ? 0 : 200, // delay closing animation slightly
+  });
+
+  // Animation for individual links (hover effect)
+  const linkHoverSpring = (hovered) =>
+    useSpring({
+      transform: hovered ? "translateY(-2px)" : "translateY(0px)",
+      color: hovered ? "#4F46E5" : "#6B7280", // Tailwind indigo-600 for hover
+      config: { tension: 300, friction: 10 },
+    });
 
   const handleLogout = () => {
     dispatch(logout());
@@ -32,7 +59,9 @@ const Navbar = () => {
       dispatch(toggleAdminMode());
       const redirectPath = !isAdminMode ? "/admin/dashboard" : "/dashboard";
       navigate(redirectPath, { replace: true });
-      toast.success(`Switched to ${!isAdminMode ? "admin" : "user"} mode`);
+      toast.success(`Switched to ${!isAdminMode ? "admin" : "user"} mode`, {
+        icon: !isAdminMode ? "🛡️" : "👤",
+      });
       setIsMenuOpen(false);
     });
     setIsModalOpen(true);
@@ -45,81 +74,116 @@ const Navbar = () => {
     setIsMenuOpen(false);
   };
 
+  const NavLink = ({
+    to,
+    onClick,
+    children,
+    title,
+    icon: Icon,
+    colorClass,
+  }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const styles = linkHoverSpring(isHovered);
+
+    const handleClick = () => {
+      if (onClick) onClick();
+      if (to) navigate(to, { replace: true });
+      setIsMenuOpen(false); // Close menu on click
+    };
+
+    return (
+      <animated.a
+        onClick={handleClick}
+        className={`flex items-center gap-2 text-sm font-medium ${
+          colorClass || "text-gray-600"
+        } hover:text-indigo-600 transition-all duration-200 cursor-pointer px-3 py-2 rounded-md`}
+        title={title}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={styles}
+      >
+        {Icon && <Icon className="h-5 w-5" aria-hidden="true" />}
+        {children}
+      </animated.a>
+    );
+  };
+
   return (
     <>
-      <nav className="bg-white shadow-md">
+      <nav className="bg-white shadow-lg border-b border-gray-100 sticky top-0 z-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             {/* Brand */}
-            <span
+            <a
               onClick={handleHomeClick}
-              className="text-xl sm:text-2xl font-bold text-blue-700 hover:underline cursor-pointer"
+              className="flex items-center gap-2 text-2xl font-extrabold text-indigo-700 hover:text-indigo-900 transition-colors cursor-pointer tracking-tight"
+              title="Go to Home"
             >
-              Email Signature App
-            </span>
+              <SparklesIcon className="h-7 w-7 text-indigo-500" />
+              SignatureGen
+            </a>
 
             {/* Desktop actions */}
             <div className="hidden md:flex items-center gap-6">
               {!user ? (
                 <>
-                  <span
-                    onClick={() => navigate("/login", { replace: true })}
-                    className="text-gray-700 hover:text-blue-600 cursor-pointer transition"
+                  <NavLink
+                    to="/login"
+                    title="Log in to your account"
+                    icon={ArrowRightStartOnRectangleIcon}
+                    colorClass="text-gray-700"
                   >
                     Login
-                  </span>
-                  <span
-                    onClick={() => navigate("/register", { replace: true })}
-                    className="text-gray-700 hover:text-green-600 cursor-pointer transition"
+                  </NavLink>
+                  <NavLink
+                    to="/register"
+                    title="Create a new account"
+                    icon={UserCircleIcon}
+                    colorClass="text-gray-700"
                   >
                     Register
-                  </span>
-                  <span
-                    onClick={() =>
-                      navigate("/forgot-password", { replace: true })
-                    }
-                    className="text-gray-700 hover:text-blue-600 cursor-pointer transition"
+                  </NavLink>
+                  <NavLink
+                    to="/forgot-password"
+                    title="Reset your password"
+                    icon={KeyIcon}
+                    colorClass="text-gray-700"
                   >
                     Forgot Password
-                  </span>
+                  </NavLink>
                 </>
               ) : (
                 <>
-                  <span
+                  <NavLink
                     onClick={handleDashboardClick}
-                    className="text-gray-700 hover:text-purple-600 cursor-pointer transition"
+                    title="Go to Dashboard"
+                    icon={HomeIcon}
+                    colorClass="text-gray-700"
                   >
                     Dashboard
-                  </span>
+                  </NavLink>
                   {user.role === "admin" && (
-                    <button
+                    <NavLink
                       onClick={handleToggleMode}
-                      className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 shadow-md"
+                      title={
+                        isAdminMode
+                          ? "Switch to User Mode"
+                          : "Switch to Admin Mode"
+                      }
+                      icon={isAdminMode ? UserCircleIcon : ShieldCheckIcon}
+                      colorClass="text-gray-700"
                     >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                        />
-                      </svg>
                       {isAdminMode ? "User Mode" : "Admin Mode"}
-                    </button>
+                    </NavLink>
                   )}
-                  <button
+                  <NavLink
                     onClick={handleLogout}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                    title="Log out of your account"
+                    icon={ArrowLeftEndOnRectangleIcon}
+                    colorClass="text-red-500 hover:text-red-700"
                   >
                     Logout
-                  </button>
+                  </NavLink>
                 </>
               )}
             </div>
@@ -130,40 +194,12 @@ const Navbar = () => {
                 aria-label="Toggle navigation menu"
                 aria-expanded={isMenuOpen}
                 onClick={() => setIsMenuOpen((v) => !v)}
-                className="inline-flex items-center justify-center rounded-md p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200"
               >
                 {isMenuOpen ? (
-                  // Close icon
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
+                  <XMarkIcon className="h-7 w-7" aria-hidden="true" />
                 ) : (
-                  // Hamburger icon
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M4 6h16M4 12h16M4 18h16"
-                    />
-                  </svg>
+                  <Bars3Icon className="h-7 w-7" aria-hidden="true" />
                 )}
               </button>
             </div>
@@ -171,70 +207,74 @@ const Navbar = () => {
         </div>
 
         {/* Mobile menu (collapsible) */}
-        <div
-          className={`md:hidden border-t transition-all duration-200 ease-out ${
-            isMenuOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
-          } overflow-hidden`}
+        <animated.div
+          style={menuAnimation}
+          className="md:hidden bg-white border-t border-gray-100 overflow-hidden shadow-inner"
         >
-          <div className="px-4 py-3 space-y-3">
+          <div className="px-4 py-3 space-y-2">
             {!user ? (
               <>
-                <button
-                  onClick={() => {
-                    navigate("/login", { replace: true });
-                    setIsMenuOpen(false);
-                  }}
-                  className="block w-full text-left text-gray-700 hover:text-blue-600"
+                <NavLink
+                  to="/login"
+                  title="Log in to your account"
+                  icon={ArrowRightStartOnRectangleIcon}
+                  colorClass="text-gray-700"
                 >
                   Login
-                </button>
-                <button
-                  onClick={() => {
-                    navigate("/register", { replace: true });
-                    setIsMenuOpen(false);
-                  }}
-                  className="block w-full text-left text-gray-700 hover:text-green-600"
+                </NavLink>
+                <NavLink
+                  to="/register"
+                  title="Create a new account"
+                  icon={UserCircleIcon}
+                  colorClass="text-gray-700"
                 >
                   Register
-                </button>
-                <button
-                  onClick={() => {
-                    navigate("/forgot-password", { replace: true });
-                    setIsMenuOpen(false);
-                  }}
-                  className="block w-full text-left text-gray-700 hover:text-blue-600"
+                </NavLink>
+                <NavLink
+                  to="/forgot-password"
+                  title="Reset your password"
+                  icon={KeyIcon}
+                  colorClass="text-gray-700"
                 >
                   Forgot Password
-                </button>
+                </NavLink>
               </>
             ) : (
               <>
-                <button
+                <NavLink
                   onClick={handleDashboardClick}
-                  className="block w-full text-left text-gray-700 hover:text-purple-600"
+                  title="Go to Dashboard"
+                  icon={HomeIcon}
+                  colorClass="text-gray-700"
                 >
                   Dashboard
-                </button>
-
+                </NavLink>
                 {user.role === "admin" && (
-                  <button
+                  <NavLink
                     onClick={handleToggleMode}
-                    className="block w-full text-left px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-md"
+                    title={
+                      isAdminMode
+                        ? "Switch to User Mode"
+                        : "Switch to Admin Mode"
+                    }
+                    icon={isAdminMode ? UserCircleIcon : ShieldCheckIcon}
+                    colorClass="text-gray-700"
                   >
                     {isAdminMode ? "User Mode" : "Admin Mode"}
-                  </button>
+                  </NavLink>
                 )}
-
-                <button
+                <NavLink
                   onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                  title="Log out of your account"
+                  icon={ArrowLeftEndOnRectangleIcon}
+                  colorClass="text-red-500 hover:text-red-700"
                 >
                   Logout
-                </button>
+                </NavLink>
               </>
             )}
           </div>
-        </div>
+        </animated.div>
       </nav>
 
       <ConfirmModal

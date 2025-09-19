@@ -1639,3 +1639,263 @@ VALUES
     NULL
   )
 ON CONFLICT (id) DO NOTHING;
+
+
+-- Check templates table
+SELECT id, name, placeholders, tokens, html, category, created_by, created_at, updated_at
+FROM signature_app.templates;
+
+-- Check for invalid placeholders
+SELECT id, name, placeholders
+FROM signature_app.templates
+WHERE placeholders IS NULL
+   OR placeholders::text = '[]'
+   OR placeholders::text !~ '^\[("[^"]*"(,\s*"[^"]*")*)?\]$';
+
+-- Fix invalid placeholders
+UPDATE signature_app.templates
+SET placeholders = '["{{user_image}}", "{{name}}", "{{role}}", "{{phone}}", "{{website}}", "{{linkedin_url}}", "{{github_url}}"]'::jsonb
+WHERE placeholders IS NULL
+   OR placeholders::text = '[]'
+   OR placeholders::text !~ '^\[("[^"]*"(,\s*"[^"]*")*)?\]$';
+
+-- Verify fix
+SELECT id, name, placeholders
+FROM signature_app.templates;
+
+
+
+
+UPDATE signature_app.templates
+SET placeholders = '["{{user_image}}", "{{name}}", "{{role}}", "{{phone}}", "{{website}}", "{{linkedin_url}}", "{{github_url}}"]'::jsonb
+WHERE id = 'be0c4445-dda0-495c-88b7-e547c92ad423';
+
+SELECT id, name, placeholders
+FROM signature_app.templates;
+
+SELECT * FROM signature_app.audit_log WHERE action IN ('TEMPLATE_ADD', 'TEMPLATE_UPDATE');
+
+
+SELECT id, name, placeholders
+FROM signature_app.templates;
+
+UPDATE signature_app.templates
+SET placeholders = '["{{user_image}}", "{{name}}", "{{role}}", "{{phone}}", "{{website}}", "{{linkedin_url}}", "{{github_url}}"]'::jsonb
+WHERE placeholders IS NULL
+   OR placeholders::text = '[]'
+   OR placeholders::text !~ '^\[("[^"]*"(,\s*"[^"]*")*)?\]$';
+
+
+
+DELETE FROM signature_app.templates WHERE id = 'be0c4445-dda0-495c-88b7-e547c92ad423';
+
+
+
+CREATE OR REPLACE FUNCTION signature_app.add_template(
+    p_name TEXT,
+    p_thumbnail TEXT,
+    p_tokens JSONB,
+    p_user_id UUID
+) RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    thumbnail TEXT,
+    tokens JSONB,
+    created_by UUID,
+    created_at TIMESTAMP WITH TIME ZONE,
+    html TEXT,
+    placeholders TEXT[],
+    category TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    INSERT INTO signature_app.templates (
+        id, name, thumbnail, tokens, created_by, created_at, html, placeholders, category, updated_at
+    ) VALUES (
+        gen_random_uuid(),
+        p_name,
+        p_thumbnail,
+        p_tokens,
+        p_user_id,
+        NOW(),
+        p_tokens->'html'->>'html',
+        (p_tokens->'placeholders')::TEXT[],
+        p_tokens->>'category',
+        NOW()
+    )
+    RETURNING
+        id,
+        name,
+        thumbnail,
+        tokens,
+        created_by,
+        created_at,
+        html,
+        placeholders,
+        category,
+        updated_at
+    INTO
+        id,
+        name,
+        thumbnail,
+        tokens,
+        created_by,
+        created_at,
+        html,
+        placeholders,
+        category,
+        updated_at;
+    RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+
+UPDATE signature_app.templates
+SET tokens = jsonb_build_object(
+    'placeholders', placeholders::jsonb,
+    'html', html,
+    'category', category
+)
+WHERE id IN (
+    'fa3a6492-158f-454b-85c6-5039355378f9',
+    '9fde4bc9-e64a-480c-9849-500979ec7276',
+    'be0c4445-dda0-495c-88b7-e547c92ad423'
+);
+
+
+-- Drop the existing function
+DROP FUNCTION IF EXISTS signature_app.add_template(text, text, jsonb, uuid);
+
+-- Create the schema and table if not already created
+CREATE SCHEMA IF NOT EXISTS signature_app;
+
+CREATE TABLE IF NOT EXISTS signature_app.templates (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    thumbnail TEXT,
+    tokens JSONB,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    html TEXT,
+    placeholders TEXT[],
+    category TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create the add_template function
+CREATE OR REPLACE FUNCTION signature_app.add_template(
+    p_name TEXT,
+    p_thumbnail TEXT,
+    p_tokens JSONB,
+    p_user_id UUID
+) RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    thumbnail TEXT,
+    tokens JSONB,
+    created_by UUID,
+    created_at TIMESTAMP WITH TIME ZONE,
+    html TEXT,
+    placeholders TEXT[],
+    category TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE
+) AS $$
+DECLARE
+    v_created_at TIMESTAMP WITH TIME ZONE := NOW();
+BEGIN
+    INSERT INTO signature_app.templates (
+        id, name, thumbnail, tokens, created_by, created_at, html, placeholders, category, updated_at
+    ) VALUES (
+        gen_random_uuid(),
+        p_name,
+        p_thumbnail,
+        p_tokens,
+        p_user_id,
+        v_created_at,
+        p_tokens->>'html',
+        (p_tokens->'placeholders')::TEXT[],
+        p_tokens->>'category',
+        v_created_at
+    )
+    RETURNING
+        id,
+        name,
+        thumbnail,
+        tokens,
+        created_by,
+        created_at,
+        html,
+        placeholders,
+        category,
+        updated_at
+    INTO
+        id,
+        name,
+        thumbnail,
+        tokens,
+        created_by,
+        created_at,
+        html,
+        placeholders,
+        category,
+        updated_at;
+    RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql;
+
+select * from signatures;
+
+
+
+
+-- Fix tokens, html, and updated_at for all templates
+UPDATE signature_app.templates
+SET
+    tokens = jsonb_build_object(
+        'html', html,
+        'placeholders', placeholders::jsonb,
+        'category', category
+    ),
+    updated_at = created_at
+WHERE id IN (
+    'fa3a6492-158f-454b-85c6-5039355378f9',
+    '9fde4bc9-e64a-480c-9849-500979ec7276',
+    'be0c4445-dda0-495c-88b7-e547c92ad423'
+);
+
+
+delete from signature_app.templates
+
+
+
+INSERT INTO signature_app.templates (id, name, placeholders, html, category) VALUES
+(
+  'fa3a6492-158f-454b-85c6-5039355378f9',
+  'New Template',
+  '["{{name}}", "{{email}}", "{{phone}}", "{{user_image}}", "{{website}}"]'::jsonb,
+  '<div>{{name}} - {{email}} - {{phone}}</div>',
+  'creative'
+),
+(
+  '9fde4bc9-e64a-480c-9849-500979ec7276',
+  'New Template',
+  '["{{user_image}}", "{{name}}", "{{role}}", "{{phone}}", "{{website}}", "{{linkedin_url}}", "{{github_url}}"]'::jsonb,
+  '<div>{{name}} - {{role}} - {{phone}}</div>',
+  'professional'
+),
+(
+  'be0c4445-dda0-495c-88b7-e547c92ad423',
+  'demo',
+  '["{{user_image}}", "{{name}}", "{{role}}", "{{phone}}", "{{website}}", "{{linkedin_url}}", "{{github_url}}"]'::jsonb,
+  '<div>{{name}} - {{role}} - {{phone}}</div>',
+  'demo'
+);
+
+
+SELECT id, name, placeholders FROM signature_app.templates;
+
+
+SELECT * FROM signature_app.signatures;
+

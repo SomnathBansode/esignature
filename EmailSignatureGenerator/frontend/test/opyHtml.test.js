@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { copyHtml } from "./copyHtml";
+import { copyHtml } from "../src/utils/copyHtml";
 
 function mockNavigatorClipboard(obj) {
   Object.defineProperty(navigator, "clipboard", {

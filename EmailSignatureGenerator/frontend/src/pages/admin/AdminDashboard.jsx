@@ -7,11 +7,12 @@ import {
   FiEdit3,
   FiUsers,
   FiList,
-  FiChevronRight,
+  FiArrowRight,
 } from "react-icons/fi";
+import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 
 const AdminDashboard = () => {
-  const { user } = useSelector((s) => s.user);
+  const { user, isAdminMode } = useSelector((s) => s.user);
   const navigate = useNavigate();
 
   // Gate: only admins
@@ -21,72 +22,130 @@ const AdminDashboard = () => {
     }
   }, [user, navigate]);
 
-  const Card = ({ to, icon: Icon, title, desc, cta = "Open" }) => (
+  // Small, presentational card component
+  const DashboardCard = ({ to, Icon, title, desc, cta = "Explore" }) => (
     <Link
       to={to}
-      className="group rounded-2xl border bg-white shadow-sm hover:shadow-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="group relative block rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_6px_24px_rgba(2,6,23,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_32px_rgba(2,6,23,0.10)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
     >
-      <div className="p-6 sm:p-8 min-h-[180px] flex flex-col justify-between">
-        <div className="flex items-start gap-4">
-          <div className="rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-blue-100">
-            <Icon className="text-blue-600" size={28} />
+      {/* Accent line */}
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+
+      {/* Hover arrow */}
+      <div className="absolute top-4 right-4 opacity-0 transition group-hover:opacity-100">
+        <FiArrowRight className="h-6 w-6 text-indigo-500 translate-x-0 group-hover:translate-x-1 transition" />
+      </div>
+
+      <div className="flex flex-col h-full">
+        {/* Icon + Title */}
+        <div className="flex items-center gap-4 mb-3">
+          <div className="rounded-xl p-3 bg-indigo-50 group-hover:bg-indigo-100 transition">
+            <Icon className="text-indigo-600" size={22} />
           </div>
-          <div>
-            <h3 className="text-lg sm:text-xl font-semibold">{title}</h3>
-            <p className="mt-1 text-gray-600 text-sm sm:text-base">{desc}</p>
-          </div>
+          <h3 className="text-lg sm:text-xl font-extrabold text-gray-900">
+            {title}
+          </h3>
         </div>
 
-        <div className="mt-6 flex items-center justify-between">
-          <span className="inline-flex items-center text-blue-700 group-hover:text-blue-800 font-medium">
-            {cta}
-            <FiChevronRight className="ml-1" />
-          </span>
-          <div className="hidden sm:block h-2 w-2 rounded-full bg-blue-200 group-hover:bg-blue-300" />
+        {/* Description */}
+        <p className="text-gray-600 text-sm sm:text-base flex-grow">{desc}</p>
+
+        {/* CTA */}
+        <div className="mt-5 text-sm font-semibold text-indigo-600 inline-flex items-center">
+          {cta}
+          <FiArrowRight className="ml-2 transition group-hover:translate-x-1" />
         </div>
       </div>
     </Link>
   );
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">Admin</h1>
-        <p className="text-gray-600 mt-1">
-          Quick links to manage templates, build new layouts, and oversee users.
-        </p>
-      </header>
+    <div className="min-h-screen bg-gray-50">
+      {/* Sticky header with gradient accent */}
+      <div className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-gray-200">
+        <div className="h-0.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-gray-900">
+                Admin Dashboard
+              </h1>
+              <p className="mt-1 text-gray-600">
+                Manage templates, build new layouts, and oversee user accounts.
+              </p>
+            </div>
 
-      <section className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <Card
-          to="/admin/templates"
-          icon={FiLayers}
-          title="Manage Templates"
-          desc="Browse all templates, edit HTML, update placeholders, or delete."
-          cta="Open templates"
-        />
-        <Card
-          to="/admin/templates/builder"
-          icon={FiEdit3}
-          title="Template Builder"
-          desc="Design new signatures visually. Export production-safe HTML."
-          cta="Open builder"
-        />
-        <Card
-          to="/admin/users"
-          icon={FiUsers}
-          title="Manage Users"
-          desc="Search users, suspend/activate accounts, and set roles."
-          cta="Open users"
-        />
-        <Card
-          to="/signatures"
-          icon={FiList}
-          title="My Signatures"
-          desc="See your saved signatures. Copy HTML or download assets."
-          cta="Open signatures"
-        />
-      </section>
+            {user?.role === "admin" && (
+              <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-indigo-700 text-sm font-semibold">
+                <ShieldCheckIcon className="h-4 w-4" />
+                {isAdminMode ? "Admin Mode Active" : "Admin Access"}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick actions */}
+        <div className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <button
+            onClick={() => navigate("/admin/templates")}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+          >
+            Manage Templates
+          </button>
+          <button
+            onClick={() => navigate("/admin/templates/builder")}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+          >
+            Open Builder
+          </button>
+          <button
+            onClick={() => navigate("/admin/users")}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+          >
+            Manage Users
+          </button>
+          <button
+            onClick={() => navigate("/signatures")}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+          >
+            My Signatures
+          </button>
+        </div>
+
+        {/* Cards grid */}
+        <section className="grid gap-6 sm:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <DashboardCard
+            to="/admin/templates"
+            Icon={FiLayers}
+            title="Manage Templates"
+            desc="Browse, edit HTML, update placeholders, and delete existing email signature templates."
+            cta="View Templates"
+          />
+          <DashboardCard
+            to="/admin/templates/builder"
+            Icon={FiEdit3}
+            title="Template Builder"
+            desc="Visually craft new signature designs. Export clean, production-ready HTML."
+            cta="Start Building"
+          />
+          <DashboardCard
+            to="/admin/users"
+            Icon={FiUsers}
+            title="Manage Users"
+            desc="Search and manage user accounts, suspend or activate, and assign roles."
+            cta="Access Users"
+          />
+          <DashboardCard
+            to="/signatures"
+            Icon={FiList}
+            title="My Signatures"
+            desc="Open your saved signatures to copy HTML or download assets quickly."
+            cta="Go to My Signatures"
+          />
+        </section>
+      </main>
     </div>
   );
 };

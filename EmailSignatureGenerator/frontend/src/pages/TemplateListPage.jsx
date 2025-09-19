@@ -1,10 +1,12 @@
+// src/pages/TemplateListPage.jsx
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchTemplates } from "../redux/slices/templateSlice";
-import TemplateGallery from "../components/TemplateGallery";
+import { fetchTemplates } from "@/redux/slices/templateSlice";
+import TemplateGallery from "@/components/TemplateGallery";
+
 const TemplateListPage = () => {
   const dispatch = useDispatch();
-  const { templates, loading, error } = useSelector((state) => state.template);
+  const { templates, loading, error } = useSelector((s) => s.template);
 
   useEffect(() => {
     dispatch(fetchTemplates());

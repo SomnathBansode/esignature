@@ -14,9 +14,9 @@ export const EXAMPLE_DATA = {
   facebook_url: "https://facebook.com/johndoe",
   instagram_url: "https://instagram.com/johndoe",
   user_image:
-    "https://res.cloudinary.com/demo/image/upload/w_150,h_150,c_fill,g_face,q_auto,f_auto/sample.jpg",
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fGZhY2V8ZW58MHx8MHx8fDA%3D",
   company_logo:
-    "https://res.cloudinary.com/demo/image/upload/w_120,c_fit,q_auto,f_auto/cloudinary_logo.png",
+    "https://images.unsplash.com/photo-1751170359998-36c22ed75d33?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OTl8fGNvZGluZyUyMGh0bWwlMjBsb2dvfGVufDB8fDB8fHww",
   font: "Arial, Helvetica, sans-serif",
   accent: "#2563eb",
 };
