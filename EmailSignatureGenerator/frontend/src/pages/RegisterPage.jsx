@@ -1,122 +1,132 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
-import { register, clearMessages } from "../redux/slices/userSlice";
+import {
+  register as registerThunk,
+  clearMessages,
+} from "../redux/slices/userSlice";
 import { useNavigate } from "react-router-dom";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
-import { ClipLoader } from "react-spinners";
+import { useSpring, animated } from "@react-spring/web";
 import toast from "react-hot-toast";
 import gsap from "gsap";
 
 const RegisterPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, loading, error } = useSelector((state) => state.user);
-  const [showPassword, setShowPassword] = React.useState(false);
+  const { user, loading, error } = useSelector((s) => s.user);
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [busyLocal, setBusyLocal] = useState(false);
+  const [success, setSuccess] = useState(false);
+
   const formRef = useRef(null);
   const animatedRef = useRef(false);
 
   const {
-    register: formRegister,
+    register,
     handleSubmit,
     formState: { errors },
     reset,
   } = useForm();
 
+  const loaderProps = useSpring({
+    opacity: (loading || busyLocal) && !success ? 1 : 0,
+    scale: (loading || busyLocal) && !success ? 1 : 0.8,
+    config: { tension: 220, friction: 18 },
+  });
+
+  const successProps = useSpring({
+    opacity: success ? 1 : 0,
+    scale: success ? 1 : 0.9,
+    config: { tension: 270, friction: 16 },
+    onRest: () => {
+      if (success)
+        navigate(user?.role === "admin" ? "/admin/dashboard" : "/dashboard", {
+          replace: true,
+        });
+    },
+  });
+
   useEffect(() => {
     dispatch(clearMessages());
     if (user && !loading) {
-      console.log("User exists, redirecting:", user);
-      if (user.role === "admin")
-        navigate("/admin/dashboard", { replace: true });
-      else navigate("/dashboard", { replace: true });
+      navigate(user.role === "admin" ? "/admin/dashboard" : "/dashboard", {
+        replace: true,
+      });
     }
-
     if (formRef.current && !animatedRef.current) {
       animatedRef.current = true;
       gsap.fromTo(
         formRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          onComplete: () => {
-            if (formRef.current) formRef.current.style.opacity = "1";
-          },
-        }
+        { opacity: 0, y: 32 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }
       );
     }
-  }, [user, navigate, dispatch, loading]);
+  }, [user, loading, dispatch, navigate]);
 
   const onSubmit = async (data) => {
-    console.log("Submitting register for email:", data.email);
+    setBusyLocal(true);
     try {
-      const promise = dispatch(
-        register({
+      await dispatch(
+        registerThunk({
           name: data.name,
           email: data.email,
           password: data.password,
         })
       ).unwrap();
-      await toast.promise(
-        promise,
-        {
-          loading: "Registering...",
-          success: "Registration successful! Welcome!",
-          error: (err) => err || "Registration failed",
-        },
-        { duration: 4000 }
-      );
-      reset(); // Clear form after success
-      console.log("Toast completed, redirecting to dashboard");
-      setTimeout(() => {
-        dispatch(clearMessages());
-        if (user && user.role === "admin")
-          navigate("/admin/dashboard", { replace: true });
-        else navigate("/dashboard", { replace: true });
-      }, 4000);
+      setBusyLocal(false);
+      setSuccess(true);
+      toast.success("Registration successful! Welcome!");
+      reset();
     } catch (err) {
-      console.error("Register error:", err);
+      setBusyLocal(false);
+      toast.error(err || "Registration failed");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <div
         ref={formRef}
-        className="max-w-md w-full mx-auto p-8 bg-white rounded-xl shadow-lg border border-gray-200"
-        style={{ opacity: 1 }}
+        className="w-[92%] max-w-md mx-auto p-8 bg-white rounded-2xl shadow-xl border border-gray-100"
       >
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
-          Register
-        </h2>
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-black tracking-tight text-gray-900">
+            Create an account
+          </h1>
+          <p className="text-sm text-gray-500">
+            Start generating beautiful email signatures
+          </p>
+        </div>
+
         {error && <p className="text-red-600 text-center mb-4">{error}</p>}
+
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div>
             <input
               type="text"
-              placeholder="Name"
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                errors.name ? "border-red-500" : "border-gray-300"
+              placeholder="Full name"
+              autoComplete="name"
+              className={`w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                errors.name ? "border-red-400" : "border-gray-300"
               }`}
-              {...formRegister("name", {
-                required: "Name is required",
-              })}
+              {...register("name", { required: "Name is required" })}
             />
             {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+              <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>
             )}
           </div>
+
           <div>
             <input
               type="email"
               placeholder="Email"
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                errors.email ? "border-red-500" : "border-gray-300"
+              autoComplete="email"
+              className={`w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                errors.email ? "border-red-400" : "border-gray-300"
               }`}
-              {...formRegister("email", {
+              {...register("email", {
                 required: "Email is required",
                 pattern: {
                   value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -125,30 +135,30 @@ const RegisterPage = () => {
               })}
             />
             {errors.email && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.email.message}
               </p>
             )}
           </div>
+
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                errors.password ? "border-red-500" : "border-gray-300"
+              autoComplete="new-password"
+              className={`w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                errors.password ? "border-red-400" : "border-gray-300"
               }`}
-              {...formRegister("password", {
+              {...register("password", {
                 required: "Password is required",
-                minLength: {
-                  value: 6,
-                  message: "Password must be at least 6 characters",
-                },
+                minLength: { value: 6, message: "At least 6 characters" },
               })}
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
                 <EyeSlashIcon className="h-5 w-5" />
@@ -157,29 +167,59 @@ const RegisterPage = () => {
               )}
             </button>
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.password.message}
               </p>
             )}
           </div>
+
           <button
             type="submit"
-            className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center disabled:opacity-50"
-            disabled={loading}
+            disabled={loading || busyLocal}
+            className="relative bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-60 flex items-center justify-center"
+            style={{ minHeight: 48 }}
           >
-            {loading ? <ClipLoader size={20} color="#fff" /> : "Register"}
+            {success ? (
+              <animated.div style={successProps} className="text-green-300">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </animated.div>
+            ) : loading || busyLocal ? (
+              <animated.div
+                style={{
+                  ...loaderProps,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div className="w-6 h-6 rounded-full bg-white/30 animate-pulse" />
+              </animated.div>
+            ) : (
+              "Register"
+            )}
           </button>
         </form>
-        <div className="mt-6 text-center space-y-2 text-gray-600">
-          <p>
-            Already have an account?{" "}
-            <span
-              onClick={() => navigate("/login")}
-              className="text-blue-600 hover:underline cursor-pointer font-medium"
-            >
-              Login here
-            </span>
-          </p>
+
+        <div className="mt-6 text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <span
+            onClick={() => navigate("/login")}
+            className="text-blue-600 hover:underline cursor-pointer font-medium"
+          >
+            Login
+          </span>
         </div>
       </div>
     </div>

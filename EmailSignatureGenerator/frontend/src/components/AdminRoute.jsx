@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
 
 const AdminRoute = ({ children }) => {
-  const { token, user, loading } = useSelector((state) => state.user);
+  const { token, user, loading } = useSelector((s) => s.user);
 
   if (loading) {
     return (
@@ -12,14 +12,8 @@ const AdminRoute = ({ children }) => {
       </div>
     );
   }
-
-  if (!token || !user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (user.role !== "admin") {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!token || !user) return <Navigate to="/login" replace />;
+  if (user.role !== "admin") return <Navigate to="/dashboard" replace />;
 
   return children;
 };

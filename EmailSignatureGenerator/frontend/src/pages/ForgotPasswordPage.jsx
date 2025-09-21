@@ -1,102 +1,108 @@
-import React, { useEffect, useRef } from "react";
+// src/pages/ForgotPasswordPage.jsx
+import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
 import { forgotPassword, clearMessages } from "../redux/slices/userSlice";
 import { useNavigate } from "react-router-dom";
-import { ClipLoader } from "react-spinners";
+import { useSpring, animated } from "@react-spring/web";
 import toast from "react-hot-toast";
 import gsap from "gsap";
 
 const ForgotPasswordPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, loading, successMessage, error } = useSelector(
-    (state) => state.user
-  );
+  const { user, loading, successMessage, error } = useSelector((s) => s.user);
+
+  const [busyLocal, setBusyLocal] = useState(false);
+
   const formRef = useRef(null);
   const animatedRef = useRef(false);
 
   const {
-    register: formRegister,
+    register,
     handleSubmit,
     formState: { errors },
     reset,
   } = useForm();
 
+  const loaderProps = useSpring({
+    opacity: loading || busyLocal ? 1 : 0,
+    scale: loading || busyLocal ? 1 : 0.8,
+    config: { tension: 220, friction: 18 },
+  });
+
   useEffect(() => {
     dispatch(clearMessages());
     if (user && !loading) {
-      console.log("User exists, redirecting:", user);
-      if (user.role === "admin")
-        navigate("/admin/dashboard", { replace: true });
-      else navigate("/dashboard", { replace: true });
+      navigate(user.role === "admin" ? "/admin/dashboard" : "/dashboard", {
+        replace: true,
+      });
     }
-
     if (formRef.current && !animatedRef.current) {
       animatedRef.current = true;
       gsap.fromTo(
         formRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          onComplete: () => {
-            if (formRef.current) formRef.current.style.opacity = "1";
-          },
-        }
+        { opacity: 0, y: 32 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }
       );
     }
-  }, [user, navigate, dispatch, loading]);
+  }, [user, loading, dispatch, navigate]);
 
   const onSubmit = async (data) => {
-    console.log("Submitting forgot password for email:", data.email);
+    setBusyLocal(true);
     try {
-      const promise = dispatch(forgotPassword({ email: data.email })).unwrap();
+      // run API + default inline loader toast
       await toast.promise(
-        promise,
+        dispatch(forgotPassword({ email: data.email })).unwrap(),
         {
-          loading: "Sending reset link...",
-          success: (message) =>
-            message || "Password reset link sent to your email!",
+          loading: "Sending reset link…",
+          // 3s success toast that survives navigation
+          success:
+            "Check your email for the reset link. If you don't see it, check your spam folder.",
           error: (err) => err || "Failed to send reset link",
         },
-        { duration: 4000 }
+        { success: { duration: 3000 }, loading: { duration: 10000 } } // loading safety
       );
-      reset(); // Clear form after success
-      setTimeout(() => {
-        dispatch(clearMessages());
-        navigate("/login", { replace: true });
-      }, 4000);
+
+      setBusyLocal(false);
+      reset();
+
+      // navigate immediately — toast will stay for 3s because <Toaster> is at app root
+      navigate("/login", { replace: true });
     } catch (err) {
-      console.error("Forgot password error:", err);
+      setBusyLocal(false);
+      // error toast already shown by toast.promise; no extra toast needed
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-purple-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <div
         ref={formRef}
-        className="max-w-md w-full mx-auto p-8 bg-white rounded-xl shadow-lg border border-gray-200"
-        style={{ opacity: 1 }}
+        className="w-[92%] max-w-md mx-auto p-8 bg-white rounded-2xl shadow-xl border border-gray-100"
       >
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
-          Forgot Password
-        </h2>
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-black tracking-tight text-gray-900">
+            Forgot Password
+          </h1>
+          <p className="text-sm text-gray-500">We’ll email you a reset link</p>
+        </div>
+
         {successMessage && (
           <p className="text-green-600 text-center mb-4">{successMessage}</p>
         )}
         {error && <p className="text-red-600 text-center mb-4">{error}</p>}
+
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div>
             <input
               type="email"
-              placeholder="Enter your email"
-              className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
-                errors.email ? "border-red-500" : "border-gray-300"
+              placeholder="Email"
+              autoComplete="email"
+              className={`w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                errors.email ? "border-red-400" : "border-gray-300"
               }`}
-              {...formRegister("email", {
+              {...register("email", {
                 required: "Email is required",
                 pattern: {
                   value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -105,32 +111,42 @@ const ForgotPasswordPage = () => {
               })}
             />
             {errors.email && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.email.message}
               </p>
             )}
           </div>
+
           <button
             type="submit"
-            className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition flex items-center justify-center disabled:opacity-50"
-            disabled={loading}
+            disabled={loading || busyLocal}
+            className="relative bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-60 flex items-center justify-center"
+            style={{ minHeight: 48 }}
           >
-            {loading ? (
-              <ClipLoader size={20} color="#fff" />
+            {loading || busyLocal ? (
+              <animated.div
+                style={{
+                  ...loaderProps,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div className="w-6 h-6 rounded-full bg-white/30 animate-pulse" />
+              </animated.div>
             ) : (
-              "Send Reset Link"
+              "Send reset link"
             )}
           </button>
         </form>
-        <div className="mt-6 text-center space-y-2 text-gray-600">
-          <p>
-            <span
-              onClick={() => navigate("/login")}
-              className="text-blue-600 hover:underline cursor-pointer font-medium"
-            >
-              Back to Login
-            </span>
-          </p>
+
+        <div className="mt-6 text-center text-sm text-gray-600">
+          <span
+            onClick={() => navigate("/login")}
+            className="text-blue-600 hover:underline cursor-pointer font-medium"
+          >
+            Back to Login
+          </span>
         </div>
       </div>
     </div>

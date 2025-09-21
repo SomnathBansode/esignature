@@ -5,4 +5,5 @@ import template from "./slices/templateSlice";
 
 export const store = configureStore({
   reducer: { user, signature, template },
+  // defaults are fine; kept simple for speed & determinism
 });
