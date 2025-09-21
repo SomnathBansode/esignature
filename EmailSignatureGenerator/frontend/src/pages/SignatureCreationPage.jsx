@@ -34,7 +34,7 @@ import cleanSignatureHtml from "../../test/cleanSignatureHtml";
 import CopyHtmlButton from "../components/CopyHtmlButton";
 import ImageUploader from "../components/ImageUploader";
 
-// ---- image safety helpers ----
+// ---- Image safety helpers ----
 const isHttpImage = (u) => /^https?:\/\/.+/i.test(u || "");
 const isDataImage = (u) =>
   /^data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+$/i.test(u || "");
@@ -72,13 +72,12 @@ const SignatureCreationPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [template, setTemplate] = useState(null);
-
   const [editableHtml, setEditableHtml] = useState("");
   const [preview, setPreview] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [socialFields, setSocialFields] = useState({});
   const [showEditor, setShowEditor] = useState(false);
+  const [imageInputMethods, setImageInputMethods] = useState({}); // New state for input method per image field
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(0);
@@ -142,7 +141,6 @@ const SignatureCreationPage = () => {
     const basicFields = fields.filter((f) =>
       ["name", "email", "phone", "user_image"].includes(f)
     );
-
     const professionalFields = fields.filter((f) =>
       [
         "role",
@@ -153,9 +151,7 @@ const SignatureCreationPage = () => {
         "company_logo",
       ].includes(f)
     );
-
     const socialFields = fields.filter((f) => SOCIAL_FIELDS.includes(f));
-
     const customFields = fields.filter(
       (f) =>
         !basicFields.includes(f) &&
@@ -164,7 +160,6 @@ const SignatureCreationPage = () => {
     );
 
     const steps = [];
-
     if (basicFields.length > 0) {
       steps.push({
         id: "basic",
@@ -174,7 +169,6 @@ const SignatureCreationPage = () => {
         fields: basicFields,
       });
     }
-
     if (professionalFields.length > 0) {
       steps.push({
         id: "professional",
@@ -184,7 +178,6 @@ const SignatureCreationPage = () => {
         fields: professionalFields,
       });
     }
-
     if (socialFields.length > 0) {
       steps.push({
         id: "social",
@@ -194,7 +187,6 @@ const SignatureCreationPage = () => {
         fields: socialFields,
       });
     }
-
     if (customFields.length > 0) {
       steps.push({
         id: "custom",
@@ -204,7 +196,6 @@ const SignatureCreationPage = () => {
         fields: customFields,
       });
     }
-
     steps.push({
       id: "preview",
       title: "Preview & Export",
@@ -227,7 +218,9 @@ const SignatureCreationPage = () => {
         setLoading(true);
         const { data } = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/templates/${templateId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
         );
 
         setTemplate(data);
@@ -242,6 +235,9 @@ const SignatureCreationPage = () => {
             if (SOCIAL_FIELDS.includes(key)) {
               setSocialFields((prev) => ({ ...prev, [key]: false }));
             }
+            if (IMAGE_FIELDS.includes(key)) {
+              setImageInputMethods((prev) => ({ ...prev, [key]: "upload" }));
+            }
           });
         }
       } catch (err) {
@@ -251,7 +247,15 @@ const SignatureCreationPage = () => {
       }
     };
     fetchTemplate();
-  }, [user, navigate, templateId, token, setValue, SOCIAL_FIELDS]);
+  }, [
+    user,
+    navigate,
+    templateId,
+    token,
+    setValue,
+    SOCIAL_FIELDS,
+    IMAGE_FIELDS,
+  ]);
 
   const replaceAllPlaceholderVariants = useCallback((raw, key, val) => {
     let out = raw;
@@ -311,16 +315,12 @@ const SignatureCreationPage = () => {
 
   const validateCurrentStep = async () => {
     if (currentStep >= FORM_STEPS.length) return true;
-
     const currentStepData = FORM_STEPS[currentStep];
     if (!currentStepData?.fields) return true;
-
     const fieldsToValidate = currentStepData.fields.filter((field) =>
       REQUIRED_FIELDS.includes(field)
     );
-
     if (fieldsToValidate.length === 0) return true;
-
     const result = await trigger(fieldsToValidate);
     return result;
   };
@@ -328,7 +328,6 @@ const SignatureCreationPage = () => {
   const handleNextStep = async () => {
     const isValid = await validateCurrentStep();
     if (!isValid) return;
-
     setCompletedSteps((prev) => new Set([...prev, currentStep]));
     setCurrentStep((prev) => Math.min(prev + 1, FORM_STEPS.length - 1));
   };
@@ -343,7 +342,6 @@ const SignatureCreationPage = () => {
     setError(null);
     try {
       let html = editableHtml;
-
       SOCIAL_FIELDS.forEach((sf) => {
         if (!socialFields[sf]) {
           const anchorWithPlaceholder = new RegExp(
@@ -425,34 +423,99 @@ const SignatureCreationPage = () => {
     });
   }, [preview]);
 
-  // ---------- renderField with ImageUploader ----------
+  // ---------- Updated renderField with ImageUploader and URL Input ----------
   const renderField = (field) => {
     const label =
       field.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) ||
       "Field";
     const isSocial = SOCIAL_FIELDS.includes(field);
     const isImageField = IMAGE_FIELDS.includes(field);
+    const inputMethod = imageInputMethods[field] || "upload";
 
-    // Image fields: show the uploader + keep the input synced for form state
     if (!isSocial && isImageField) {
       const val = watch(field) || "";
       return (
         <div key={field} className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             {label}
+            {REQUIRED_FIELDS.includes(field) && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
           </label>
 
-          {/* hidden input keeps RHF in control */}
-          <input type="hidden" {...register(field)} />
+          {/* Input Method Toggle */}
+          <div className="flex items-center gap-4 mb-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`${field}_input_method`}
+                value="upload"
+                checked={inputMethod === "upload"}
+                onChange={() =>
+                  setImageInputMethods((prev) => ({
+                    ...prev,
+                    [field]: "upload",
+                  }))
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              Upload Image
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`${field}_input_method`}
+                value="url"
+                checked={inputMethod === "url"}
+                onChange={() =>
+                  setImageInputMethods((prev) => ({ ...prev, [field]: "url" }))
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              Enter URL
+            </label>
+          </div>
 
-          <ImageUploader
-            label={`Upload ${label.toLowerCase()}`}
-            value={val}
-            onChange={(url) =>
-              setValue(field, url, { shouldDirty: true, shouldTouch: true })
-            }
-            className="mt-1"
+          {/* Hidden input keeps RHF in control */}
+          <input
+            type="hidden"
+            {...register(field, {
+              validate: (value) =>
+                REQUIRED_FIELDS.includes(field) && !value
+                  ? `${label} is required`
+                  : value && !sanitizeImgSrc(value)
+                  ? "Invalid image URL"
+                  : true,
+            })}
           />
+
+          {inputMethod === "upload" ? (
+            <ImageUploader
+              label={`Upload ${label.toLowerCase()}`}
+              value={val}
+              onChange={(url) =>
+                setValue(field, url, { shouldDirty: true, shouldTouch: true })
+              }
+              className="mt-1"
+            />
+          ) : (
+            <input
+              type="url"
+              className={`w-full p-3 border rounded-lg transition-colors ${
+                errors[field]
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                  : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+              } focus:ring-2 focus:outline-none`}
+              placeholder={`Enter ${label.toLowerCase()} URL`}
+              value={val}
+              onChange={(e) =>
+                setValue(field, e.target.value, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                })
+              }
+            />
+          )}
 
           {errors[field] && (
             <p className="text-red-500 text-sm mt-1">{errors[field].message}</p>
@@ -461,7 +524,6 @@ const SignatureCreationPage = () => {
       );
     }
 
-    // Social checkbox + text input
     return (
       <div key={field} className="mb-6">
         {isSocial ? (

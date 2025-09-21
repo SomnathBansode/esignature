@@ -60,15 +60,13 @@ const SignatureEditPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   const [signature, setSignature] = useState(null);
   const [template, setTemplate] = useState(null);
-
   const [editableHtml, setEditableHtml] = useState("");
-  const [preview, setPreview] = useState(""); // FINALIZED HTML
-
+  const [preview, setPreview] = useState("");
   const [socialFields, setSocialFields] = useState({});
   const [saving, setSaving] = useState(false);
+  const [imageInputMethods, setImageInputMethods] = useState({}); // New state for input method per image field
 
   const previewRef = useRef(null);
 
@@ -153,6 +151,12 @@ const SignatureEditPage = () => {
                 [key]: !!(savedVal && String(savedVal).trim()),
               }));
             }
+            if (IMAGE_FIELDS.includes(key)) {
+              setImageInputMethods((prev) => ({
+                ...prev,
+                [key]: savedVal && isHttpImage(savedVal) ? "url" : "upload",
+              }));
+            }
           });
         } else {
           setEditableHtml(sigRes.data.html_code || "");
@@ -167,6 +171,16 @@ const SignatureEditPage = () => {
                 ),
               }));
             }
+            if (IMAGE_FIELDS.includes(k)) {
+              setImageInputMethods((prev) => ({
+                ...prev,
+                [k]:
+                  sigRes.data.form_data[k] &&
+                  isHttpImage(sigRes.data.form_data[k])
+                    ? "url"
+                    : "upload",
+              }));
+            }
           });
         }
       } catch (e) {
@@ -176,7 +190,7 @@ const SignatureEditPage = () => {
       }
     };
     load();
-  }, [user, token, id, navigate, setValue, SOCIAL_FIELDS]);
+  }, [user, token, id, navigate, setValue, SOCIAL_FIELDS, IMAGE_FIELDS]);
 
   const replaceAllPlaceholderVariants = useCallback((raw, key, val) => {
     let out = raw;
@@ -188,7 +202,6 @@ const SignatureEditPage = () => {
     return out;
   }, []);
 
-  // Build FINAL preview
   const updatePreview = useCallback(() => {
     if (!editableHtml) return;
     let html = editableHtml;
@@ -249,7 +262,6 @@ const SignatureEditPage = () => {
     setSaving(true);
     try {
       let html = editableHtml;
-
       Object.keys(socialFields).forEach((sf) => {
         if (!socialFields[sf]) {
           const anchorWithPlaceholder = new RegExp(
@@ -290,7 +302,6 @@ const SignatureEditPage = () => {
     }
   };
 
-  // PNG from the same finalized HTML
   const handleDownloadPng = async () => {
     if (!preview) return;
     try {
@@ -323,13 +334,14 @@ const SignatureEditPage = () => {
     return w?.user_image || w?.image || w?.company_logo || EXAMPLES.user_image;
   })();
 
-  // ---------- renderField with ImageUploader ----------
+  // ---------- Updated renderField with ImageUploader and URL Input ----------
   const renderField = (field) => {
     const label =
       field.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) ||
       "Field";
     const isSocial = SOCIAL_FIELDS.includes(field);
     const isImageField = IMAGE_FIELDS.includes(field);
+    const inputMethod = imageInputMethods[field] || "upload";
 
     if (!isSocial && isImageField) {
       const val = watch(field) || "";
@@ -337,19 +349,82 @@ const SignatureEditPage = () => {
         <div key={field} className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             {label}
+            {REQUIRED_FIELDS.includes(field) && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
           </label>
 
-          {/* hidden input keeps RHF in control */}
-          <input type="hidden" {...register(field)} />
+          {/* Input Method Toggle */}
+          <div className="flex items-center gap-4 mb-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`${field}_input_method`}
+                value="upload"
+                checked={inputMethod === "upload"}
+                onChange={() =>
+                  setImageInputMethods((prev) => ({
+                    ...prev,
+                    [field]: "upload",
+                  }))
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              Upload Image
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`${field}_input_method`}
+                value="url"
+                checked={inputMethod === "url"}
+                onChange={() =>
+                  setImageInputMethods((prev) => ({ ...prev, [field]: "url" }))
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              Enter URL
+            </label>
+          </div>
 
-          <ImageUploader
-            label={`Upload ${label.toLowerCase()}`}
-            value={val}
-            onChange={(url) =>
-              setValue(field, url, { shouldDirty: true, shouldTouch: true })
-            }
-            className="mt-1"
+          {/* Hidden input keeps RHF in control */}
+          <input
+            type="hidden"
+            {...register(field, {
+              validate: (value) =>
+                REQUIRED_FIELDS.includes(field) && !value
+                  ? `${label} is required`
+                  : value && !sanitizeImgSrc(value)
+                  ? "Invalid image URL"
+                  : true,
+            })}
           />
+
+          {inputMethod === "upload" ? (
+            <ImageUploader
+              label={`Upload ${label.toLowerCase()}`}
+              value={val}
+              onChange={(url) =>
+                setValue(field, url, { shouldDirty: true, shouldTouch: true })
+              }
+              className="mt-1"
+            />
+          ) : (
+            <input
+              type="url"
+              className={`w-full p-3 border rounded-lg ${
+                errors[field] ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder={`Enter ${label.toLowerCase()} URL`}
+              value={val}
+              onChange={(e) =>
+                setValue(field, e.target.value, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                })
+              }
+            />
+          )}
 
           {errors[field] && (
             <p className="text-red-500 text-sm mt-1">{errors[field].message}</p>
