@@ -10,9 +10,26 @@ import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import proxyRoutes from "./routes/proxy.js";
 import { testEmail } from "./utils/mailer.js";
+import uploadsRouter from "./routes/uploadRoutes.js";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
+
+// Validate critical environment variables
+const requiredEnvVars = [
+  "CLOUDINARY_CLOUD_NAME",
+  "CLOUDINARY_API_KEY",
+  "CLOUDINARY_API_SECRET",
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "EMAIL_USER",
+  "EMAIL_PASS",
+];
+const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
+if (missingEnvVars.length > 0) {
+  console.error("Missing environment variables:", missingEnvVars);
+  process.exit(1);
+}
 
 // --- CORS setup ---
 const allowedOrigins = [
@@ -66,7 +83,8 @@ app.use("/api/templates", templateRoutes);
 app.use("/api/signatures", signatureRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/proxy", proxyRoutes); // <-- single proxy mount (no duplicate inline handler)
+app.use("/api/proxy", proxyRoutes);
+app.use("/api/uploads", uploadsRouter);
 
 // Basic error handler
 app.use((err, _req, res, _next) => {
@@ -117,6 +135,11 @@ const server = app.listen(process.env.PORT || 5050, async () => {
     EMAIL_USER: process.env.EMAIL_USER || "Missing",
     EMAIL_PASS: process.env.EMAIL_PASS ? "Set" : "Missing",
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "Missing",
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || "Missing",
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET
+      ? "Set"
+      : "Missing",
+    CLOUDINARY_SIGN_ALGORITHM: process.env.CLOUDINARY_SIGN_ALGORITHM || "sha1",
   });
   await checkConnection();
 });

@@ -25,27 +25,15 @@ import {
 } from "react-icons/fi";
 import { FaGithub } from "react-icons/fa";
 import cleanSignatureHtml from "../../test/cleanSignatureHtml";
+import { emailizeHtml } from "../utils/copyHtml";
+import CopyHtmlButton from "../components/CopyHtmlButton";
+import ImageUploader from "../components/ImageUploader";
 
 const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
   /\/$/,
   ""
 );
 
-// ---- image helpers ----
-const isHttp = (u) => /^https?:\/\//i.test(u || "");
-const isProtocolRelative = (u) => /^\/\//.test(u || "");
-const isDataImg = (u) =>
-  /^data:image\/[a-z0-9.+-]+(?:;charset=[^;,]+)?(?:;base64)?,/i.test(u || "");
-const absolutize = (u) => {
-  if (!u) return null;
-  try {
-    if (isHttp(u) || isDataImg(u) || u.startsWith("blob:")) return u;
-    if (isProtocolRelative(u)) return `${window.location.protocol}${u}`;
-    return new URL(u, `${API}/`).href;
-  } catch {
-    return null;
-  }
-};
 const BROKEN_PLACEHOLDER =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -77,7 +65,7 @@ const SignatureEditPage = () => {
   const [template, setTemplate] = useState(null);
 
   const [editableHtml, setEditableHtml] = useState("");
-  const [preview, setPreview] = useState("");
+  const [preview, setPreview] = useState(""); // FINALIZED HTML
 
   const [socialFields, setSocialFields] = useState({});
   const [saving, setSaving] = useState(false);
@@ -95,6 +83,10 @@ const SignatureEditPage = () => {
       "instagram_url",
       "github_url",
     ],
+    []
+  );
+  const IMAGE_FIELDS = useMemo(
+    () => ["user_image", "company_logo", "image", "avatar", "logo"],
     []
   );
 
@@ -196,6 +188,7 @@ const SignatureEditPage = () => {
     return out;
   }, []);
 
+  // Build FINAL preview
   const updatePreview = useCallback(() => {
     if (!editableHtml) return;
     let html = editableHtml;
@@ -227,8 +220,11 @@ const SignatureEditPage = () => {
       html = replaceAllPlaceholderVariants(html, key, val);
     });
 
-    // ⬇️ sanitize before preview
-    setPreview(cleanSignatureHtml(html));
+    (async () => {
+      const cleaned = cleanSignatureHtml(html);
+      const finalized = await emailizeHtml(cleaned);
+      setPreview(finalized);
+    })();
   }, [
     editableHtml,
     watch,
@@ -279,7 +275,6 @@ const SignatureEditPage = () => {
         html = replaceAllPlaceholderVariants(html, key, val || "");
       });
 
-      // ⬇️ save cleaned HTML
       await axios.put(
         `${API}/api/signatures/${signature.id}`,
         { form_data: outForm, html_code: cleanSignatureHtml(html) },
@@ -295,91 +290,25 @@ const SignatureEditPage = () => {
     }
   };
 
-  // PNG export: clone, absolutize/inline images, render
-  const toDataURL = (url) =>
-    new Promise((resolve) => {
-      const abs = absolutize(url);
-      if (!abs || !isHttp(abs)) return resolve(null);
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        try {
-          const c = document.createElement("canvas");
-          c.width = img.naturalWidth || img.width;
-          c.height = img.naturalHeight || img.height;
-          const ctx = c.getContext("2d");
-          ctx.drawImage(img, 0, 0);
-          resolve(c.toDataURL("image/png"));
-        } catch {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = abs;
-    });
-
-  const embedImages = async (rootEl) => {
-    const imgs = Array.from(rootEl.querySelectorAll("img"));
-    await Promise.all(
-      imgs.map(async (img) => {
-        const abs = absolutize(img.getAttribute("src"));
-        if (!abs) {
-          img.src = BROKEN_PLACEHOLDER;
-          return;
-        }
-        img.setAttribute("crossorigin", "anonymous");
-        if (isHttp(abs)) {
-          const dataUrl = await toDataURL(abs);
-          if (dataUrl) img.src = dataUrl;
-        } else {
-          img.src = abs;
-        }
-      })
-    );
-  };
-
-  const handleCopyHtml = async () => {
+  // PNG from the same finalized HTML
+  const handleDownloadPng = async () => {
     if (!preview) return;
     try {
-      const cleaned = cleanSignatureHtml(preview);
-      if (window.ClipboardItem) {
-        await navigator.clipboard.write([
-          new window.ClipboardItem({
-            "text/html": new Blob([cleaned], { type: "text/html" }),
-            "text/plain": new Blob([cleaned], { type: "text/plain" }),
-          }),
-        ]);
-      } else {
-        await navigator.clipboard.writeText(cleaned);
-      }
-      toast.success("Copied rich HTML (cleaned).");
-    } catch {
-      toast.error("Copy failed");
-    }
-  };
+      const offscreen = document.createElement("div");
+      offscreen.style.cssText =
+        "position:fixed;left:-99999px;top:-99999px;pointer-events:none;";
+      offscreen.innerHTML = preview;
+      document.body.appendChild(offscreen);
 
-  const handleDownloadPng = async () => {
-    if (!previewRef.current) return;
-    try {
-      const clone = previewRef.current.cloneNode(true);
-      document.body.appendChild(clone);
-      clone.querySelectorAll("img").forEach((img) => {
-        const raw = img.getAttribute("src");
-        const abs = absolutize(raw);
-        img.setAttribute("crossorigin", "anonymous");
-        img.src = abs || BROKEN_PLACEHOLDER;
-      });
-      await embedImages(clone);
-
-      const canvas = await html2canvas(clone, {
+      const canvas = await html2canvas(offscreen, {
         useCORS: true,
         allowTaint: false,
         backgroundColor: null,
         scale: window.devicePixelRatio || 1,
-        ignoreElements: (el) =>
-          el.tagName === "IMG" && !absolutize(el.getAttribute("src")),
       });
-      document.body.removeChild(clone);
+
+      document.body.removeChild(offscreen);
+
       const link = document.createElement("a");
       link.download = "signature.png";
       link.href = canvas.toDataURL("image/png");
@@ -394,25 +323,91 @@ const SignatureEditPage = () => {
     return w?.user_image || w?.image || w?.company_logo || EXAMPLES.user_image;
   })();
 
-  useEffect(() => {
-    const host = previewRef.current;
-    if (!host) return;
-    host.querySelectorAll("img").forEach((img) => {
-      const raw = img.getAttribute("src");
-      const abs = absolutize(raw);
-      img.setAttribute("crossorigin", "anonymous");
-      if (/logo/i.test(img.alt || "") || /company_logo/.test(raw || "")) {
-        img.setAttribute("width", img.getAttribute("width") || "100");
-        img.style.maxWidth = "100px";
-        img.style.height = "auto";
-      }
-      img.src = abs || BROKEN_PLACEHOLDER;
-      img.onerror = () => {
-        img.onerror = null;
-        img.src = BROKEN_PLACEHOLDER;
-      };
-    });
-  }, [preview]);
+  // ---------- renderField with ImageUploader ----------
+  const renderField = (field) => {
+    const label =
+      field.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) ||
+      "Field";
+    const isSocial = SOCIAL_FIELDS.includes(field);
+    const isImageField = IMAGE_FIELDS.includes(field);
+
+    if (!isSocial && isImageField) {
+      const val = watch(field) || "";
+      return (
+        <div key={field} className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {label}
+          </label>
+
+          {/* hidden input keeps RHF in control */}
+          <input type="hidden" {...register(field)} />
+
+          <ImageUploader
+            label={`Upload ${label.toLowerCase()}`}
+            value={val}
+            onChange={(url) =>
+              setValue(field, url, { shouldDirty: true, shouldTouch: true })
+            }
+            className="mt-1"
+          />
+
+          {errors[field] && (
+            <p className="text-red-500 text-sm mt-1">{errors[field].message}</p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div key={field} className="mb-6">
+        {isSocial ? (
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="checkbox"
+              checked={!!socialFields[field]}
+              onChange={(e) =>
+                setSocialFields((prev) => ({
+                  ...prev,
+                  [field]: e.target.checked,
+                }))
+              }
+              className="h-5 w-5"
+            />
+            <label className="block text-sm font-medium text-gray-700">
+              {label.replace("_url", "")}
+            </label>
+          </div>
+        ) : (
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {label}
+            {REQUIRED_FIELDS.includes(field) && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
+          </label>
+        )}
+
+        {socialFields[field] || !isSocial ? (
+          <input
+            type={field.includes("url") ? "url" : "text"}
+            className={`w-full p-3 border rounded-lg ${
+              errors[field] ? "border-red-500" : "border-gray-300"
+            }`}
+            placeholder={EXAMPLES[field] || ""}
+            {...register(field, {
+              required: REQUIRED_FIELDS.includes(field)
+                ? `${label} is required`
+                : false,
+            })}
+          />
+        ) : null}
+
+        {errors[field] && (
+          <p className="text-red-500 text-sm">{errors[field].message}</p>
+        )}
+      </div>
+    );
+  };
+  // ----------------------------------------------------
 
   if (loading) {
     return (
@@ -442,7 +437,7 @@ const SignatureEditPage = () => {
 
         <div className="flex items-center gap-4 mb-4">
           <img
-            src={absolutize(imgUrl) || BROKEN_PLACEHOLDER}
+            src={imgUrl || BROKEN_PLACEHOLDER}
             alt="Profile"
             className="w-20 h-20 rounded-full object-cover border"
             onError={(e) => {
@@ -469,61 +464,7 @@ const SignatureEditPage = () => {
               const field = String(raw)
                 .replace(/^\s*\{\{\s*/, "")
                 .replace(/\s*\}\}\s*$/, "");
-              const label =
-                field
-                  .replace(/_/g, " ")
-                  .replace(/\b\w/g, (m) => m.toUpperCase()) || "Field";
-              const isSocial = SOCIAL_FIELDS.includes(field);
-              const isUrlLike =
-                field.includes("url") || field.includes("image");
-
-              return (
-                <div key={field}>
-                  {isSocial ? (
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={!!socialFields[field]}
-                        onChange={(e) =>
-                          setSocialFields((prev) => ({
-                            ...prev,
-                            [field]: e.target.checked,
-                          }))
-                        }
-                        className="h-5 w-5"
-                      />
-                      <label className="block text-sm font-medium text-gray-700">
-                        {label.replace("_url", "")}
-                      </label>
-                    </div>
-                  ) : (
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {label}
-                    </label>
-                  )}
-
-                  {socialFields[field] || !isSocial ? (
-                    <input
-                      type={isUrlLike ? "url" : "text"}
-                      className={`w-full p-3 border rounded-lg ${
-                        errors[field] ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder={EXAMPLES[field] || ""}
-                      {...register(field, {
-                        required: REQUIRED_FIELDS.includes(field)
-                          ? `${label} is required`
-                          : false,
-                      })}
-                    />
-                  ) : null}
-
-                  {errors[field] && (
-                    <p className="text-red-500 text-sm">
-                      {errors[field].message}
-                    </p>
-                  )}
-                </div>
-              );
+              return renderField(field);
             })}
 
             <div className="flex flex-wrap gap-2">
@@ -538,14 +479,13 @@ const SignatureEditPage = () => {
                   "Save Changes"
                 )}
               </button>
-              <button
-                type="button"
-                onClick={handleCopyHtml}
+
+              <CopyHtmlButton
+                html={preview}
+                label="Copy"
                 className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700"
-                title="Copy as rich HTML"
-              >
-                <FiCopy /> Copy
-              </button>
+              />
+
               <button
                 type="button"
                 onClick={handleDownloadPng}
