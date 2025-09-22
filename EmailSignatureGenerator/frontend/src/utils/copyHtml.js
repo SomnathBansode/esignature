@@ -1,13 +1,15 @@
+// frontend/src/utils/copyHtml.js
 /**
  * Robust rich HTML copy helper with image + (safe) CSS inlining + circular avatar embed.
- * - Inlines <img> to data: URLs (caps + timeout + optional proxy)
- * - Inlines a WHITELIST of computed styles into style="" (email-safe)
- * - Makes images responsive (max-width:100%; height:auto; display:block)
- * - PRESERVES round avatars by converting <img data-avatar> into a circular PNG
- * - ClipboardItem -> execCommand -> writeText fallback
+ * Now supports a "mobile-safe" path by allowing callers to disable image inlining,
+ * so Gmail on iOS/Android won't drop images (data: URLs).
  *
  * USAGE:
- *   const ok = await copyHtml(htmlString);
+ *   // Mobile-safe: no inlined images; all URLs absolutized
+ *   await copyHtml(htmlString, /* plainText *-/ undefined, { inlineImages: false, inlineCss: true });
+ *
+ *   // If you really want inlined images (desktop-only scenarios):
+ *   await copyHtml(htmlString, undefined, { inlineImages: true, inlineCss: true });
  */
 
 const MAX_INLINE_IMAGES = Number(import.meta.env.VITE_MAX_INLINE_IMAGES ?? 20);
@@ -35,6 +37,21 @@ function isData(u) {
 }
 function isBlob(u) {
   return /^blob:/i.test(u || "");
+}
+function isProtocolRelative(u) {
+  return /^\/\//.test(u || "");
+}
+
+function absolutizeUrl(url) {
+  try {
+    if (!url) return "";
+    if (isData(url) || isBlob(url)) return url; // leave as-is if present
+    if (isHttp(url)) return url;
+    if (isProtocolRelative(url)) return `${window.location.protocol}${url}`;
+    return new URL(url, document.baseURI).toString();
+  } catch {
+    return url;
+  }
 }
 
 function absolutize(url) {
@@ -89,8 +106,6 @@ async function fetchWithTimeout(url, { timeout = 5000 } = {}) {
 
 /* ---------------- image inlining ---------------- */
 async function inlineImagesInHtml(html) {
-  if (!INLINE_IMAGES_ENABLED) return String(html ?? "");
-
   const tpl = document.createElement("template");
   tpl.innerHTML = String(html ?? "");
 
@@ -204,8 +219,6 @@ const SAFE_PROPS = new Set([
   "padding-bottom",
   "padding-left",
   "text-decoration",
-
-  // layout that affects pasting fidelity
   "margin",
   "margin-top",
   "margin-right",
@@ -214,12 +227,8 @@ const SAFE_PROPS = new Set([
   "border-collapse",
   "table-layout",
   "border-spacing",
-
-  // needed for round/cropped avatars
   "object-fit",
   "object-position",
-
-  // responsive image rules
   "width",
   "height",
   "max-width",
@@ -464,6 +473,21 @@ async function embedCircularAvatars(html) {
   return doc.body.innerHTML;
 }
 
+/* ---------------- absolutize links & images ---------------- */
+function absolutizeLinksAndImages(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = String(html ?? "");
+
+  tpl.content.querySelectorAll("img[src]").forEach((img) => {
+    img.setAttribute("src", absolutizeUrl(img.getAttribute("src")));
+  });
+  tpl.content.querySelectorAll("a[href]").forEach((a) => {
+    a.setAttribute("href", absolutizeUrl(a.getAttribute("href")));
+  });
+
+  return tpl.innerHTML;
+}
+
 /* ---------------- make a finalized, email-safe HTML string ---------------- */
 export async function emailizeHtml(
   html,
@@ -489,6 +513,11 @@ export async function emailizeHtml(
     document.body.removeChild(container);
   }
 
+  // Make URLs absolute early so fetch works as expected if we inline
+  try {
+    processedHtml = absolutizeLinksAndImages(processedHtml);
+  } catch {}
+
   if (DO_INLINE_IMAGES) {
     try {
       processedHtml = await inlineImagesInHtml(processedHtml);
@@ -497,21 +526,30 @@ export async function emailizeHtml(
     }
   }
 
-  // After width/height attrs + possible data: URLs, embed circular avatars.
-  try {
-    processedHtml = await embedCircularAvatars(processedHtml);
-  } catch {
-    /* ignore */
+  // Only embed circular avatars (data: URLs) when we inline images
+  if (DO_INLINE_IMAGES) {
+    try {
+      processedHtml = await embedCircularAvatars(processedHtml);
+    } catch {
+      /* ignore */
+    }
   }
+
+  // One more absolutize pass (in case an embed altered sources)
+  try {
+    processedHtml = absolutizeLinksAndImages(processedHtml);
+  } catch {}
 
   return processedHtml;
 }
 
 /* ---------------- main copy function ---------------- */
-export async function copyHtml(html, plainText) {
-  const processedHtml = await emailizeHtml(html);
+export async function copyHtml(html, plainText, opts = {}) {
+  // Allow callers to force mobile-safe: { inlineImages: false, inlineCss: true }
+  const processedHtml = await emailizeHtml(html, opts);
   const plain = plainText ?? toPlainText(processedHtml);
 
+  // Async Clipboard API with rich HTML
   try {
     if (navigator.clipboard && window.ClipboardItem) {
       const item = new window.ClipboardItem({
@@ -523,6 +561,7 @@ export async function copyHtml(html, plainText) {
     }
   } catch {}
 
+  // execCommand fallback
   try {
     const div = document.createElement("div");
     div.setAttribute("contenteditable", "true");
@@ -551,6 +590,7 @@ export async function copyHtml(html, plainText) {
     if (ok) return true;
   } catch {}
 
+  // Plain text only, last resort
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(plain);
