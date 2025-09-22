@@ -23,6 +23,29 @@ const DEFAULT_PLACEHOLDERS = [
 /* Built-in categories to show in the select / chips */
 const BUILTIN_CATEGORIES = ["creative", "professional", "minimal", "modern"];
 
+/* Allowed placeholders (guard) */
+const ALLOWED_PLACEHOLDERS = new Set([
+  "{{user_image}}",
+  "{{company_logo}}",
+  "{{name}}",
+  "{{title}}",
+  "{{company}}",
+  "{{phone}}",
+  "{{email}}",
+  "{{website}}",
+  "{{linkedin_url}}",
+  "{{github_url}}",
+  "{{twitter_url}}",
+  "{{facebook_url}}",
+  "{{instagram_url}}",
+  "{{address}}",
+  "{{font}}",
+  "{{accent}}",
+]);
+
+/* Regex to pick {{placeholders}} from HTML */
+const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+
 /* Helpers */
 function uniqSorted(list) {
   const seen = new Set();
@@ -37,6 +60,39 @@ function uniqSorted(list) {
     }
   }
   return out.sort((a, b) => a.localeCompare(b));
+}
+
+function extractPlaceholdersFromHtml(html) {
+  const found = [];
+  const seen = new Set();
+  let m;
+  while ((m = PLACEHOLDER_RE.exec(html || ""))) {
+    const key = m[1] ? m[1].trim() : "";
+    if (!key) continue;
+    const raw = `{{${key}}}`;
+    if (!seen.has(raw)) {
+      seen.add(raw);
+      found.push(raw);
+    }
+  }
+  return found;
+}
+
+function toJsonArrayString(arr) {
+  try {
+    return JSON.stringify(arr, null, 2);
+  } catch {
+    return "[]";
+  }
+}
+
+function parseJsonArray(str) {
+  try {
+    const val = JSON.parse(str || "[]");
+    return Array.isArray(val) ? val : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function TemplateForm({
@@ -76,6 +132,12 @@ export default function TemplateForm({
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState({});
 
+  /* Auto-detect toggle (default ON for new, OFF for edit to avoid surprises) */
+  const [autoDetectPH, setAutoDetectPH] = useState(!template);
+
+  /* Restrict to allowed placeholders */
+  const [restrictAllowed, setRestrictAllowed] = useState(true);
+
   /* ---------- quick add category UI ---------- */
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCat, setNewCat] = useState("");
@@ -104,7 +166,8 @@ export default function TemplateForm({
     setErrors({});
     setShowNewCat(false);
     setNewCat("");
-  }, [initial]);
+    setAutoDetectPH(!template); // reset when switching edit/new
+  }, [initial, template]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -118,6 +181,23 @@ export default function TemplateForm({
     setShowNewCat(false);
     setNewCat("");
   };
+
+  /* ---------- auto-extract placeholders when HTML changes ---------- */
+  useEffect(() => {
+    if (!autoDetectPH) return;
+    const extracted = extractPlaceholdersFromHtml(form.html);
+
+    // optional guard: only allowed placeholders
+    const filtered = restrictAllowed
+      ? extracted.filter((p) => ALLOWED_PLACEHOLDERS.has(p))
+      : extracted;
+
+    // if no change, do nothing
+    const nextStr = toJsonArrayString(filtered);
+    if (nextStr !== form.placeholders) {
+      setForm((f) => ({ ...f, placeholders: nextStr }));
+    }
+  }, [form.html, autoDetectPH, restrictAllowed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- validation ---------- */
   const validate = () => {
@@ -153,6 +233,7 @@ export default function TemplateForm({
   const submit = (e) => {
     e.preventDefault();
     if (!validate()) return;
+
     const payload = {
       name: form.name.trim(),
       category: (form.category || "").trim() || "creative",
@@ -161,7 +242,59 @@ export default function TemplateForm({
       tokens: JSON.parse(form.tokens || "{}"),
       placeholders: JSON.parse(form.placeholders || "[]"),
     };
+
+    // Hard-guard: if restrictAllowed is ON, filter at save-time too
+    if (restrictAllowed && Array.isArray(payload.placeholders)) {
+      payload.placeholders = payload.placeholders.filter((p) =>
+        ALLOWED_PLACEHOLDERS.has(p)
+      );
+    }
+
     onSubmit?.(payload);
+  };
+
+  /* ---------- diffs for helper UI ---------- */
+  const detectedFromHtml = useMemo(
+    () => extractPlaceholdersFromHtml(form.html),
+    [form.html]
+  );
+
+  const currentList = useMemo(
+    () => parseJsonArray(form.placeholders),
+    [form.placeholders]
+  );
+
+  const detectedFiltered = useMemo(
+    () =>
+      restrictAllowed
+        ? detectedFromHtml.filter((p) => ALLOWED_PLACEHOLDERS.has(p))
+        : detectedFromHtml,
+    [detectedFromHtml, restrictAllowed]
+  );
+
+  const missingInJson = useMemo(
+    () => detectedFiltered.filter((p) => !currentList.includes(p)),
+    [detectedFiltered, currentList]
+  );
+
+  const unusedInHtml = useMemo(
+    () => currentList.filter((p) => !detectedFromHtml.includes(p)),
+    [currentList, detectedFromHtml]
+  );
+
+  const filteredOut = useMemo(
+    () =>
+      restrictAllowed
+        ? detectedFromHtml.filter((p) => !ALLOWED_PLACEHOLDERS.has(p))
+        : [],
+    [detectedFromHtml, restrictAllowed]
+  );
+
+  const applyExtractNow = () => {
+    const useList = restrictAllowed
+      ? detectedFromHtml.filter((p) => ALLOWED_PLACEHOLDERS.has(p))
+      : detectedFromHtml;
+    setForm((f) => ({ ...f, placeholders: toJsonArrayString(useList) }));
   };
 
   return (
@@ -286,28 +419,30 @@ export default function TemplateForm({
                   )}
                 </select>
 
-                {!showNewCat ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowNewCat(true)}
-                    className="shrink-0 px-4 py-3 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 text-gray-700 font-medium"
-                    title="Add a new category"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                <div className="flex items-center gap-2">
+                  {!showNewCat ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCat(true)}
+                      className="shrink-0 px-4 py-3 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 text-gray-700 font-medium"
+                      title="Add a new category"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                  </button>
-                ) : null}
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               {showNewCat && (
@@ -420,6 +555,41 @@ export default function TemplateForm({
                 HTML
               </span>
             </label>
+
+            {/* Auto-detect controls */}
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={autoDetectPH}
+                  onChange={(e) => setAutoDetectPH(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Auto-detect placeholders from HTML
+              </label>
+
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={restrictAllowed}
+                  onChange={(e) => setRestrictAllowed(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Restrict to allowed keys
+              </label>
+
+              {!autoDetectPH && (
+                <button
+                  type="button"
+                  onClick={applyExtractNow}
+                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
+                  title="Extract placeholders from current HTML"
+                >
+                  Extract now
+                </button>
+              )}
+            </div>
+
             <textarea
               name="html"
               value={form.html}
@@ -448,6 +618,29 @@ export default function TemplateForm({
                 {errors.html}
               </div>
             )}
+
+            {/* Helper: detected list */}
+            <div className="mt-3 text-xs text-gray-600">
+              <div className="flex flex-wrap gap-2">
+                {detectedFiltered.length > 0 ? (
+                  detectedFiltered.map((p) => (
+                    <span
+                      key={p}
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 font-mono"
+                    >
+                      {p}
+                    </span>
+                  ))
+                ) : (
+                  <span className="italic">No placeholders detected yet.</span>
+                )}
+              </div>
+              {filteredOut.length > 0 && (
+                <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1 font-mono">
+                  Ignored (not in allowed list): {filteredOut.join(", ")}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -547,6 +740,7 @@ export default function TemplateForm({
                   Array
                 </span>
               </label>
+
               <textarea
                 name="placeholders"
                 value={form.placeholders}
@@ -575,6 +769,67 @@ export default function TemplateForm({
                   {errors.placeholders}
                 </div>
               )}
+
+              {/* Diff helper */}
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                  <div className="font-semibold text-emerald-800 mb-1">
+                    Detected in HTML ({detectedFiltered.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {detectedFiltered.length ? (
+                      detectedFiltered.map((p) => (
+                        <span
+                          key={p}
+                          className="px-2 py-0.5 bg-white rounded border border-emerald-200 font-mono text-emerald-800"
+                        >
+                          {p}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="italic text-emerald-700">—</span>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                  <div className="font-semibold text-amber-800 mb-1">
+                    Missing in JSON ({missingInJson.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {missingInJson.length ? (
+                      missingInJson.map((p) => (
+                        <span
+                          key={p}
+                          className="px-2 py-0.5 bg-white rounded border border-amber-200 font-mono text-amber-800"
+                        >
+                          {p}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="italic text-amber-700">—</span>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="font-semibold text-slate-800 mb-1">
+                    Unused in HTML ({unusedInHtml.length})
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {unusedInHtml.length ? (
+                      unusedInHtml.map((p) => (
+                        <span
+                          key={p}
+                          className="px-2 py-0.5 bg-white rounded border border-slate-200 font-mono text-slate-800"
+                        >
+                          {p}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="italic text-slate-700">—</span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -77,7 +77,7 @@ const SignatureCreationPage = () => {
   const [saving, setSaving] = useState(false);
   const [socialFields, setSocialFields] = useState({});
   const [showEditor, setShowEditor] = useState(false);
-  const [imageInputMethods, setImageInputMethods] = useState({}); // New state for input method per image field
+  const [imageInputMethods, setImageInputMethods] = useState({});
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(0);
@@ -444,7 +444,7 @@ const SignatureCreationPage = () => {
           </label>
 
           {/* Input Method Toggle */}
-          <div className="flex items-center gap-4 mb-3">
+          <div className="flex flex-wrap items-center gap-4 mb-3">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
@@ -613,63 +613,66 @@ const SignatureCreationPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6">
         {/* Progress Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
             Create Email Signature
           </h1>
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {FORM_STEPS.map((step, index) => {
-                const Icon = step.icon;
-                const isActive = index === currentStep;
-                const isCompleted = completedSteps.has(index);
+            <div className="w-full overflow-x-auto">
+              <div className="flex items-center space-x-3 sm:space-x-4 min-w-max pr-2">
+                {FORM_STEPS.map((step, index) => {
+                  const Icon = step.icon;
+                  const isActive = index === currentStep;
+                  const isCompleted = completedSteps.has(index);
 
-                return (
-                  <div key={step.id} className="flex items-center">
-                    <div
-                      className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
-                        isCompleted
-                          ? "bg-green-500 text-white"
-                          : isActive
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-200 text-gray-500"
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <FiCheck className="w-5 h-5" />
-                      ) : (
-                        <Icon className="w-5 h-5" />
+                  return (
+                    <div key={step.id} className="flex items-center">
+                      <div
+                        className={`flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full transition-all ${
+                          isCompleted
+                            ? "bg-green-500 text-white"
+                            : isActive
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 text-gray-500"
+                        }`}
+                        title={step.title}
+                      >
+                        {isCompleted ? (
+                          <FiCheck className="w-5 h-5" />
+                        ) : (
+                          <Icon className="w-5 h-5" />
+                        )}
+                      </div>
+                      {index < FORM_STEPS.length - 1 && (
+                        <div
+                          className={`w-8 sm:w-12 h-1 mx-2 sm:mx-3 transition-all ${
+                            isCompleted ? "bg-green-500" : "bg-gray-200"
+                          }`}
+                        />
                       )}
                     </div>
-                    {index < FORM_STEPS.length - 1 && (
-                      <div
-                        className={`w-12 h-1 mx-2 transition-all ${
-                          isCompleted ? "bg-green-500" : "bg-gray-200"
-                        }`}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="hidden sm:block text-sm text-gray-500 pl-4">
               Step {currentStep + 1} of {FORM_STEPS.length}
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-8">
+        <div className="flex flex-col xl:flex-row gap-6 xl:gap-8">
           {/* Form Section */}
           <div className="xl:w-1/2">
-            <div className="bg-white rounded-xl shadow-sm border p-8">
+            <div className="bg-white rounded-xl shadow-sm border p-5 sm:p-8">
               <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-gray-900 flex items-center gap-3">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 flex items-center gap-3">
                   <currentStepData.icon className="w-6 h-6 text-blue-600" />
                   {currentStepData.title}
                 </h2>
-                <p className="text-gray-600 mt-1">
+                <p className="text-gray-600 mt-1 text-sm sm:text-base">
                   {currentStepData.description}
                 </p>
               </div>
@@ -682,16 +685,16 @@ const SignatureCreationPage = () => {
                 ) : (
                   <div className="space-y-6">
                     {/* Final Step - Export Options */}
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                       <CopyHtmlButton
                         html={preview}
                         label="Copy HTML"
-                        className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors"
+                        className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors justify-center"
                       />
                       <button
                         type="button"
                         onClick={handleDownloadPng}
-                        className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 transition-colors"
+                        className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 transition-colors justify-center"
                       >
                         <FiDownload /> Download PNG
                       </button>
@@ -702,7 +705,7 @@ const SignatureCreationPage = () => {
                       <button
                         type="button"
                         onClick={() => setShowEditor(!showEditor)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                        className="w-full sm:w-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors justify-center"
                       >
                         <FiEdit3 />
                         {showEditor ? "Hide" : "Show"} HTML Editor
@@ -722,7 +725,7 @@ const SignatureCreationPage = () => {
                             onClick={() =>
                               setEditableHtml(template?.html || "")
                             }
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm"
+                            className="w-full sm:w-auto inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm justify-center"
                           >
                             <FiRotateCcw /> Reset to Original
                           </button>
@@ -749,12 +752,12 @@ const SignatureCreationPage = () => {
 
                 {/* Navigation Buttons */}
                 {!isPreviewStep && (
-                  <div className="flex justify-between mt-8">
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8">
                     <button
                       type="button"
                       onClick={handlePrevStep}
                       disabled={currentStep === 0}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors justify-center"
                     >
                       <FiChevronLeft /> Previous
                     </button>
@@ -762,7 +765,7 @@ const SignatureCreationPage = () => {
                     <button
                       type="button"
                       onClick={handleNextStep}
-                      className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors justify-center"
                     >
                       {isLastStep ? "Review" : "Next"} <FiChevronRight />
                     </button>
@@ -774,25 +777,25 @@ const SignatureCreationPage = () => {
 
           {/* Enhanced Preview Section */}
           <div className="xl:w-1/2">
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden sticky top-6">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
-                <h3 className="text-xl font-semibold flex items-center gap-2">
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden xl:sticky xl:top-6">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
                   <FiEye /> Live Preview
                 </h3>
-                <p className="text-blue-100 text-sm mt-1">
+                <p className="text-blue-100 text-xs sm:text-sm mt-1">
                   See how your signature will look in real-time
                 </p>
               </div>
 
-              <div className="p-6">
+              <div className="p-5 sm:p-6">
                 <div
                   ref={previewRef}
-                  className="border-2 border-dashed border-gray-200 p-6 rounded-lg bg-white min-h-[200px] transition-all hover:border-blue-300"
+                  className="border-2 border-dashed border-gray-200 p-4 sm:p-6 rounded-lg bg-white min-h-[200px] transition-all hover:border-blue-300 overflow-auto"
                   dangerouslySetInnerHTML={{ __html: preview }}
                 />
 
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                  <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-gray-600 mb-3">
                     <span className="inline-flex items-center gap-1">
                       <FiPhone /> Phone
                     </span>
@@ -810,9 +813,8 @@ const SignatureCreationPage = () => {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">
-                    💡 Your signature will automatically update as you fill out
-                    the form. All links and images will be preserved when
-                    copied.
+                    💡 Your signature updates as you fill the form. Links and
+                    images are preserved when copied.
                   </p>
                 </div>
               </div>

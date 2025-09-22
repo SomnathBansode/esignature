@@ -34,6 +34,77 @@ const API = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
   ""
 );
 
+// ---- image safety helpers (local to this file) ----
+const isHttpImage = (u) => /^https?:\/\/.+/i.test(u || "");
+
+const isDataImage = (u) =>
+  /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+=?=?$/i.test(u || "");
+
+const isBlobOrObjectUrl = (u) =>
+  /^(blob:|webkit-blob:|moz-blob:|object:|filesystem:)/i.test(u || "");
+
+/**
+ * Accept safe image sources for email/editor usage:
+ * - http/https (CDN, Cloudinary, etc.)
+ * - data:image/*;base64 (when allowed)
+ * - blob/object URLs (ok for preview; strip before persisting if desired)
+ */
+const sanitizeImgSrc = (u) => {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  if (isHttpImage(s)) return s;
+  if (isDataImage(s)) return s;
+  if (isBlobOrObjectUrl(s)) return s; // preview only
+  return "";
+};
+
+// -- preview hardening: lock image sizes so they don't shrink --
+const PREVIEW_CSS = `
+  <style>
+    /* scope inside preview container only */
+    .sig-preview * { box-sizing: border-box; }
+    .sig-preview table { border-collapse: collapse; table-layout: auto; }
+    .sig-preview td, .sig-preview th { vertical-align: top; }
+
+    /* generic image rules */
+    .sig-preview img {
+      display: block;                 /* removes inline gaps */
+      height: auto !important;        /* keep aspect */
+      max-width: 100% !important;     /* responsive inside cells */
+      image-rendering: auto;
+      -ms-interpolation-mode: bicubic;
+    }
+
+    /* don't let important images collapse when text grows */
+    .sig-preview img[alt*="avatar" i],
+    .sig-preview img[alt*="user" i],
+    .sig-preview img[alt*="profile" i] {
+      width: 96px !important;
+      height: 96px !important;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .sig-preview img[alt*="logo" i],
+    .sig-preview img[alt*="brand" i] {
+      width: 120px !important;
+      height: auto !important;
+    }
+
+    /* fallback: if no useful alt, still keep a floor */
+    .sig-preview img:not([width]):not([height]) {
+      min-width: 72px;                /* prevents “tiny” collapse */
+      min-height: 72px;
+    }
+
+    /* long words/URLs shouldn’t squash columns */
+    .sig-preview a, .sig-preview td, .sig-preview div, .sig-preview p, .sig-preview span {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+  </style>
+`;
+
 const BROKEN_PLACEHOLDER =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -66,7 +137,7 @@ const SignatureEditPage = () => {
   const [preview, setPreview] = useState("");
   const [socialFields, setSocialFields] = useState({});
   const [saving, setSaving] = useState(false);
-  const [imageInputMethods, setImageInputMethods] = useState({}); // New state for input method per image field
+  const [imageInputMethods, setImageInputMethods] = useState({}); // per-image field
 
   const previewRef = useRef(null);
 
@@ -195,7 +266,7 @@ const SignatureEditPage = () => {
   const replaceAllPlaceholderVariants = useCallback((raw, key, val) => {
     let out = raw;
     const pats = [
-      new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "gi"),
+      new RegExp(`\\{\\{\\s*${key}\\s*\\}}`, "gi"),
       new RegExp(`\\{\\s*${key}\\s*\\}`, "gi"),
     ];
     pats.forEach((p) => (out = out.replace(p, val)));
@@ -210,7 +281,7 @@ const SignatureEditPage = () => {
     Object.keys(socialFields).forEach((sf) => {
       if (!socialFields[sf]) {
         const anchorWithPlaceholder = new RegExp(
-          `<a[^>]*href=["'][^"']*\\{\\{\\s*${sf}\\s*\\}\\}[^"']*["'][^>]*>.*?<\\/a>`,
+          `<a[^>]*href=["'][^"]*\\{\\{\\s*${sf}\\s*\\}\\}[^"']*["'][^>]*>.*?<\\/a>`,
           "gis"
         );
         html = html.replace(anchorWithPlaceholder, "");
@@ -236,7 +307,8 @@ const SignatureEditPage = () => {
     (async () => {
       const cleaned = cleanSignatureHtml(html);
       const finalized = await emailizeHtml(cleaned);
-      setPreview(finalized);
+      // wrap + inject CSS so styles are scoped and persistent in preview
+      setPreview(`${PREVIEW_CSS}<div class="sig-preview">${finalized}</div>`);
     })();
   }, [
     editableHtml,
@@ -265,7 +337,7 @@ const SignatureEditPage = () => {
       Object.keys(socialFields).forEach((sf) => {
         if (!socialFields[sf]) {
           const anchorWithPlaceholder = new RegExp(
-            `<a[^>]*href=["'][^"']*\\{\\{\\s*${sf}\\s*\\}\\}[^"']*["'][^>]*>.*?<\\/a>`,
+            `<a[^>]*href=["'][^"]*\\{\\{\\s*${sf}\\s*\\}\\}[^"']*["'][^>]*>.*?<\\/a>`,
             "gis"
           );
           html = html.replace(anchorWithPlaceholder, "");
@@ -285,6 +357,17 @@ const SignatureEditPage = () => {
         const val = (data?.[key] ?? "").trim();
         outForm[key] = val;
         html = replaceAllPlaceholderVariants(html, key, val || "");
+      });
+
+      // Optional: strip blob/object URLs before saving
+      Object.keys(outForm).forEach((k) => {
+        if (
+          ["user_image", "company_logo", "image", "avatar", "logo"].includes(k)
+        ) {
+          if (/^(blob:|object:|filesystem:)/i.test(outForm[k] || "")) {
+            outForm[k] = ""; // or keep previous URL per your policy
+          }
+        }
       });
 
       await axios.put(
@@ -506,7 +589,7 @@ const SignatureEditPage = () => {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
+    <div className="p-8 max-ww-7xl mx-auto flex flex-col lg:flex-row gap-8">
       <div className="w-full lg:w-1/2">
         <h1 className="text-2xl font-bold mb-4">Edit Signature</h1>
 
@@ -644,7 +727,7 @@ const SignatureEditPage = () => {
         </h2>
         <div
           ref={previewRef}
-          className="border p-4 rounded-lg bg-gray-50"
+          className="border p-4 rounded-lg bg-gray-50 overflow-x-auto min-h-40"
           dangerouslySetInnerHTML={{ __html: preview }}
         />
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-600">

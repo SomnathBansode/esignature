@@ -1,3 +1,4 @@
+// dont change main code make it resopnsive
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -55,13 +56,7 @@ function EmailPreviewBox({ html, baseWidth = 520, isVisible }) {
   const recalc = () => {
     const outer = outerRef.current;
     const inner = innerRef.current;
-    if (!outer || !inner) {
-      console.log("EmailPreviewBox: Missing refs", {
-        outer: !!outer,
-        inner: !!inner,
-      });
-      return;
-    }
+    if (!outer || !inner) return;
 
     inner.style.transform = "scale(1)";
     inner.style.width = `${baseWidth}px`;
@@ -76,25 +71,10 @@ function EmailPreviewBox({ html, baseWidth = 520, isVisible }) {
 
     const scaledH = naturalH * scale;
     outer.style.height = `${Math.max(120, scaledH + 20)}px`;
-    console.log("EmailPreviewBox: Recalculated", {
-      availW,
-      naturalH,
-      scale,
-      height: outer.style.height,
-    });
   };
 
   useEffect(() => {
-    if (!isVisible) {
-      console.log("EmailPreviewBox: Not visible, skipping render");
-      return;
-    }
-
-    console.log("EmailPreviewBox: Rendering", {
-      htmlLength: html?.length,
-      htmlSnippet: html?.slice(0, 50),
-      isVisible,
-    });
+    if (!isVisible) return;
 
     recalc();
     const ro = new ResizeObserver(recalc);
@@ -107,17 +87,12 @@ function EmailPreviewBox({ html, baseWidth = 520, isVisible }) {
     });
 
     const imgs = innerRef.current?.querySelectorAll?.("img") || [];
-    console.log("EmailPreviewBox: Found images", imgs.length);
-    imgs.forEach((img, i) => {
+    imgs.forEach((img) => {
       const raw = img.getAttribute("src");
       const abs = absolutize(raw);
-      console.log(`EmailPreviewBox: Image ${i} src`, raw, "absolutized", abs);
       img.setAttribute("crossorigin", "anonymous");
       img.src = abs || BROKEN_PLACEHOLDER;
       img.onerror = () => {
-        console.log(
-          `EmailPreviewBox: Image ${i} failed to load, using placeholder`
-        );
         img.onerror = null;
         img.src = BROKEN_PLACEHOLDER;
       };
@@ -143,7 +118,7 @@ function EmailPreviewBox({ html, baseWidth = 520, isVisible }) {
         html ? (
           <div
             ref={innerRef}
-            className="p-4 break-words animate-fade-in min-h-[120px]
+            className="p-3 sm:p-4 break-words animate-fade-in min-h-[120px]
             [&_img]:max-w-full [&_img]:h-auto [&_img]:align-middle
             [&_table]:border-collapse [&_td]:border-0 [&_th]:border-0"
             dangerouslySetInnerHTML={{ __html: html }}
@@ -155,7 +130,7 @@ function EmailPreviewBox({ html, baseWidth = 520, isVisible }) {
         )
       ) : (
         <div className="flex items-center justify-center min-h-[120px]">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin motion-reduce:hidden" />
         </div>
       )}
     </div>
@@ -167,20 +142,8 @@ function PreviewModal({ isOpen, onClose, signature }) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    console.log("PreviewModal: State", {
-      isOpen,
-      signatureId: signature?.id,
-      signatureName: signature?.form_data?.name,
-      hasHtmlCode: !!signature?.html_code,
-    });
-
     const finalizeHtml = async () => {
       if (!isOpen || !signature || !signature.html_code) {
-        console.log("PreviewModal: Skipping render", {
-          isOpen,
-          hasSignature: !!signature,
-          hasHtmlCode: !!signature?.html_code,
-        });
         setPreviewHtml("");
         setIsLoading(false);
         return;
@@ -188,33 +151,18 @@ function PreviewModal({ isOpen, onClose, signature }) {
 
       setIsLoading(true);
       try {
-        console.log(
-          "PreviewModal: Raw html_code",
-          signature.html_code.slice(0, 50)
-        );
         const cleaned = cleanSignatureHtml(signature.html_code || "");
-        console.log("PreviewModal: Cleaned HTML", {
-          length: cleaned.length,
-          snippet: cleaned.slice(0, 50),
-        });
         let finalized = "";
         try {
           const result = await copyHtml(cleaned, true);
           finalized = typeof result === "string" ? result : "";
-          console.log("PreviewModal: Finalized HTML", {
-            length: finalized.length,
-            snippet: finalized.slice(0, 50),
-            type: typeof result,
-          });
-        } catch (copyError) {
-          console.error("PreviewModal: copyHtml failed", copyError);
+        } catch {
           finalized = cleaned; // Fallback to cleaned if copyHtml fails
         }
         setPreviewHtml(
           finalized || cleaned || "<div>No content available</div>"
         );
       } catch (error) {
-        console.error("PreviewModal: Error in finalizeHtml", error);
         toast.error(
           "Failed to generate preview: " + (error.message || "Unknown error")
         );
@@ -235,7 +183,7 @@ function PreviewModal({ isOpen, onClose, signature }) {
     try {
       const offscreen = document.createElement("div");
       offscreen.style.cssText =
-        "position:fixed;left:-99999px;top:-99999px;pointer-events:none;width:520px;padding:16px;";
+        "position:fixed;left:-99999px;top:-99999px;pointer-events:none;width:520px;max-width:520px;padding:16px;";
       offscreen.innerHTML = previewHtml;
       document.body.appendChild(offscreen);
 
@@ -255,7 +203,6 @@ function PreviewModal({ isOpen, onClose, signature }) {
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (error) {
-      console.error("PreviewModal: PNG export failed", error);
       toast.error(
         "PNG export failed: " +
           (error.message || "Ensure images are CORS-enabled")
@@ -272,8 +219,7 @@ function PreviewModal({ isOpen, onClose, signature }) {
       const ok = await copyHtml(previewHtml);
       if (ok) toast.success("Copied rich HTML (cleaned)");
       else toast.error("Copy failed. Try a desktop browser.");
-    } catch (error) {
-      console.error("PreviewModal: Copy failed", error);
+    } catch {
       toast.error("Copy failed");
     }
   };
@@ -290,29 +236,25 @@ function PreviewModal({ isOpen, onClose, signature }) {
       aria-label="Full signature preview"
     >
       <div
-        className="relative bg-white rounded-2xl max-w-4xl w-full mx-4 p-6 shadow-xl transform transition-transform duration-300"
+        className="relative bg-white rounded-2xl w-full mx-3 sm:mx-4 p-4 sm:p-6 shadow-xl transform transition-transform duration-300 max-w-[95vw] sm:max-w-3xl"
         style={{ maxHeight: "90vh", overflowY: "auto" }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-600 hover:bg-slate-100 rounded-full"
+          className="absolute top-3 sm:top-4 right-3 sm:right-4 p-2 text-slate-600 hover:bg-slate-100 rounded-full"
           aria-label="Close preview"
         >
           <XMarkIcon className="h-5 w-5" />
         </button>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-3 sm:mb-4">
           {signature?.form_data?.name || "Preview"}
         </h2>
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[120px]">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin motion-reduce:hidden" />
           </div>
         ) : (
-          <EmailPreviewBox
-            html={previewHtml}
-            baseWidth={baseWidth}
-            isVisible={true}
-          />
+          <EmailPreviewBox html={previewHtml} baseWidth={baseWidth} isVisible />
         )}
         <div className="flex flex-wrap gap-2 justify-end mt-4">
           <button
@@ -371,24 +313,10 @@ const SignatureListPage = () => {
         const res = await axios.get(`${API}/api/signatures`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (alive) {
-          console.log("SignatureListPage: Fetched signatures", {
-            count: res.data?.length,
-            sample: res.data?.[0]
-              ? {
-                  id: res.data[0].id,
-                  htmlLength: res.data[0].html_code?.length,
-                  formData: res.data[0].form_data,
-                }
-              : null,
-          });
-          setSignatures(res.data || []);
-        }
+        if (alive) setSignatures(res.data || []);
       } catch (err) {
-        if (alive) {
-          console.error("SignatureListPage: Fetch error", err);
+        if (alive)
           setError(err.response?.data?.error || "Failed to fetch signatures");
-        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -410,13 +338,8 @@ const SignatureListPage = () => {
     if (isPreviewOpen && previewSig) {
       const fresh = signatures.find((s) => s.id === previewSig.id);
       if (fresh && fresh !== previewSig) {
-        console.log("SignatureListPage: Updating previewSig", fresh.id);
         setPreviewSig(fresh);
       } else if (!fresh) {
-        console.log(
-          "SignatureListPage: Closing preview, signature not found",
-          previewSig.id
-        );
         setIsPreviewOpen(false);
         toast.error("Signature no longer exists");
       }
@@ -469,12 +392,6 @@ const SignatureListPage = () => {
       }
     });
 
-    console.log("SignatureListPage: Filtered signatures", {
-      count: sorted.length,
-      sample: sorted[0]
-        ? { id: sorted[0].id, name: sorted[0].form_data?.name }
-        : null,
-    });
     return sorted;
   }, [signatures, debouncedSearch, sortBy, withImages]);
 
@@ -482,11 +399,6 @@ const SignatureListPage = () => {
     const out = {};
     for (const s of filtered) {
       const cleaned = cleanSignatureHtml(s.html_code || "");
-      console.log("SignatureListPage: Cleaned HTML for", {
-        id: s.id,
-        length: cleaned.length,
-        snippet: cleaned.slice(0, 50),
-      });
       out[s.id] = cleaned;
     }
     return out;
@@ -495,16 +407,12 @@ const SignatureListPage = () => {
   useEffect(() => {
     const observers = filtered.map((s) => {
       const el = document.getElementById(`signature-card-${s.id}`);
-      if (!el) {
-        console.log("SignatureListPage: No element for signature", s.id);
-        return null;
-      }
+      if (!el) return null;
 
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
-              console.log("SignatureListPage: Signature visible", s.id);
               setVisibility((prev) => ({ ...prev, [s.id]: true }));
               observer.disconnect();
             }
@@ -528,13 +436,11 @@ const SignatureListPage = () => {
       toast.success("Signature deleted");
       setIsModalOpen(false);
     } catch (err) {
-      console.error("SignatureListPage: Delete error", err);
       toast.error(err.response?.data?.error || "Failed to delete signature");
     }
   };
 
   const handleDelete = (id, name) => {
-    console.log("SignatureListPage: Opening delete modal for", id, name);
     setPendingDelete({ id, name });
     setIsModalOpen(true);
   };
@@ -548,8 +454,7 @@ const SignatureListPage = () => {
       const ok = await copyHtml(cleanedById[sig.id]);
       if (ok) toast.success("Copied rich HTML (cleaned)");
       else toast.error("Copy failed. Try a desktop browser.");
-    } catch (error) {
-      console.error("SignatureListPage: Copy error", error);
+    } catch {
       toast.error("Copy failed");
     }
   };
@@ -580,7 +485,6 @@ const SignatureListPage = () => {
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (error) {
-      console.error("SignatureListPage: PNG export error", error);
       toast.error(
         "PNG export failed: " +
           (error.message || "Ensure images are CORS-enabled")
@@ -610,32 +514,34 @@ const SignatureListPage = () => {
   }
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(59,130,246,0.08),transparent),radial-gradient(900px_500px_at_80%_-10%,rgba(147,51,234,0.08),transparent)]">
-        <div className="text-center text-red-600">{error}</div>
+      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(59,130,246,0.08),transparent),radial-gradient(900px_500px_at_80%_-10%,rgba(147,51,234,0.08),transparent)] px-4">
+        <div className="text-center text-red-600 text-sm sm:text-base">
+          {error}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(59,130,246,0.08),transparent),radial-gradient(900px_500px_at_80%_-10%,rgba(147,51,234,0.08),transparent)]">
-      <header className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-4">
-        <div className="flex items-start sm:items-center justify-between gap-6 flex-col sm:flex-row">
-          <div>
+      <header className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 pt-6 sm:pt-12 pb-4">
+        <div className="flex items-start sm:items-center justify-between gap-4 sm:gap-6 flex-col sm:flex-row">
+          <div className="w-full sm:w-auto">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-600/10 px-3 py-1">
               <MagnifyingGlassIcon className="h-4 w-4 text-blue-600" />
               <span className="text-xs font-semibold text-blue-700">
                 My Signatures
               </span>
             </div>
-            <h1 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
+            <h1 className="mt-3 text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
               My Signatures
             </h1>
-            <p className="mt-1 text-slate-600">
+            <p className="mt-1 text-slate-600 text-sm sm:text-base">
               Manage your email signatures below.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="hidden sm:block rounded-2xl border border-slate-200 bg-white px-4 sm:px-5 py-2.5 sm:py-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <DocumentDuplicateIcon className="h-5 w-5 text-emerald-600" />
                 <span className="text-sm font-semibold text-slate-700">
@@ -645,7 +551,7 @@ const SignatureListPage = () => {
             </div>
             <button
               onClick={() => navigate("/signatures/create")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+              className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
               aria-label="Create new signature"
             >
               <PencilIcon className="h-4 w-4" />
@@ -656,9 +562,9 @@ const SignatureListPage = () => {
       </header>
 
       <div className="sticky top-0 z-30 border-y border-slate-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="relative group">
+            <div className="relative group md:flex-1">
               <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition group-focus-within:opacity-20" />
               <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm">
                 <MagnifyingGlassIcon className="ml-3 h-5 w-5 text-slate-400" />
@@ -666,7 +572,7 @@ const SignatureListPage = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by name, email, company..."
-                  className="w-full min-w-[260px] sm:min-w-[360px] md:min-w-[420px] px-3 py-2.5 text-slate-900 placeholder:text-slate-400 bg-transparent border-0 focus:outline-none"
+                  className="w-full px-3 py-2.5 text-slate-900 placeholder:text-slate-400 bg-transparent border-0 focus:outline-none"
                   aria-label="Search signatures"
                 />
                 {search && (
@@ -682,14 +588,14 @@ const SignatureListPage = () => {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <div>
+              <div className="min-w-[140px]">
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
                   Sort
                 </label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm"
                   aria-label="Sort signatures"
                 >
                   <option value="newest">Newest</option>
@@ -699,7 +605,7 @@ const SignatureListPage = () => {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 pt-6">
+              <div className="flex items-center gap-2 pt-1 sm:pt-6">
                 <input
                   id="withImages"
                   type="checkbox"
@@ -729,12 +635,12 @@ const SignatureListPage = () => {
         </div>
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+      <main className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6">
         <div
           className="
             relative rounded-2xl border border-slate-200 bg-white/60 backdrop-blur
-            p-4 sm:p-5
-            h-[70vh] sm:h-[75vh] lg:h-[78vh]
+            p-3 sm:p-5
+            h-auto max-h-[78vh] sm:h-[75vh] lg:h-[78vh]
             overflow-y-auto
             scroll-smooth
             scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent
@@ -743,35 +649,40 @@ const SignatureListPage = () => {
           aria-label="Signature gallery"
         >
           {signatures.length === 0 ? (
-            <div className="grid h-full place-items-center text-center">
+            <div className="grid h-full place-items-center text-center p-6">
               <div>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
-                  <MagnifyingGlassIcon className="h-8 w-8 text-blue-600" />
+                <div className="mx-auto mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
+                  <MagnifyingGlassIcon className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900">
+                <h3 className="text-lg sm:text-xl font-black text-slate-900">
                   No signatures found
                 </h3>
-                <p className="mt-1 text-slate-600">
+                <p className="mt-1 text-slate-600 text-sm sm:text-base">
                   Create a new signature to get started.
                 </p>
               </div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="grid h-full place-items-center text-center">
+            <div className="grid h-full place-items-center text-center p-6">
               <div>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
-                  <MagnifyingGlassIcon className="h-8 w-8 text-blue-600" />
+                <div className="mx-auto mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
+                  <MagnifyingGlassIcon className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900">
+                <h3 className="text-lg sm:text-xl font-black text-slate-900">
                   Nothing matches your filters
                 </h3>
-                <p className="mt-1 text-slate-600">
+                <p className="mt-1 text-slate-600 text-sm sm:text-base">
                   Try different keywords or reset filters.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-6">
+            <div
+              className="
+                grid gap-4 sm:gap-5 lg:gap-6
+                grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4
+              "
+            >
               {filtered.map((signature) => {
                 const title = signature.form_data?.name || "Untitled";
                 const html = cleanedById[signature.id] || "";
@@ -788,7 +699,7 @@ const SignatureListPage = () => {
                     aria-label={`Edit signature: ${title}`}
                   >
                     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
-                    <div className="p-5 bg-slate-50">
+                    <div className="p-3 sm:p-5 bg-slate-50">
                       <div id={`signature-preview-${signature.id}`}>
                         <EmailPreviewBox
                           html={html}
@@ -797,27 +708,15 @@ const SignatureListPage = () => {
                         />
                       </div>
                     </div>
-                    <div className="p-5">
+                    <div className="p-4 sm:p-5">
                       <div className="mb-3 flex items-center gap-3">
-                        <h3 className="flex-1 truncate text-base font-extrabold text-slate-900">
+                        <h3 className="flex-1 truncate text-sm sm:text-base font-extrabold text-slate-900">
                           {title}
                         </h3>
-                        <div className="flex gap-2 pointer-events-auto">
+                        <div className="hidden sm:flex gap-2 pointer-events-auto">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (!signature) {
-                                console.log(
-                                  "SignatureListPage: Invalid signature for preview"
-                                );
-                                toast.error("Invalid signature selected");
-                                return;
-                              }
-                              console.log(
-                                "SignatureListPage: Opening preview for",
-                                signature.id,
-                                title
-                              );
                               setPreviewSig(signature);
                               setIsPreviewOpen(true);
                             }}
@@ -869,31 +768,18 @@ const SignatureListPage = () => {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-blue-700">
                           <MagnifyingGlassIcon className="h-4 w-4" />
                           Signature
                         </span>
                       </div>
                     </div>
-                    <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-slate-900/90 px-3 py-1 text-[11px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      Click to edit
-                    </div>
-                    <div className="sm:hidden px-5 py-3 border-t border-slate-200 mt-auto flex flex-wrap gap-2">
+
+                    {/* Mobile action bar */}
+                    <div className="sm:hidden px-3 sm:px-5 py-3 border-t border-slate-200 mt-auto flex flex-wrap gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!signature) {
-                            console.log(
-                              "SignatureListPage: Invalid signature for preview (mobile)"
-                            );
-                            toast.error("Invalid signature selected");
-                            return;
-                          }
-                          console.log(
-                            "SignatureListPage: Opening preview (mobile) for",
-                            signature.id,
-                            title
-                          );
                           setPreviewSig(signature);
                           setIsPreviewOpen(true);
                         }}
@@ -948,6 +834,10 @@ const SignatureListPage = () => {
                         Delete
                       </button>
                     </div>
+
+                    <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-slate-900/90 px-3 py-1 text-[11px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      Click to edit
+                    </div>
                   </div>
                 );
               })}
@@ -968,7 +858,6 @@ const SignatureListPage = () => {
       <PreviewModal
         isOpen={isPreviewOpen}
         onClose={() => {
-          console.log("SignatureListPage: Closing PreviewModal");
           setIsPreviewOpen(false);
           setPreviewSig(null);
         }}

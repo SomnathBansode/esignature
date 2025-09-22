@@ -68,7 +68,7 @@ function EmailPreviewBox({ html, baseWidth = 520, isVisible }) {
       {isVisible ? (
         <div
           ref={innerRef}
-          className="p-4 break-words animate-fade-in
+          className="p-3 sm:p-4 break-words animate-fade-in
           [&_img]:max-w-full [&_img]:h-auto [&_img]:align-middle
           [&_table]:border-collapse [&_td]:border-0 [&_th]:border-0"
           dangerouslySetInnerHTML={{ __html: html }}
@@ -105,17 +105,17 @@ function PreviewModal({ isOpen, onClose, template }) {
       aria-label="Full template preview"
     >
       <div
-        className="relative bg-white rounded-2xl max-w-3xl w-full mx-4 p-6 shadow-xl transform transition-transform duration-300"
+        className="relative bg-white rounded-2xl w-full mx-3 sm:mx-4 p-4 sm:p-6 shadow-xl transform transition-transform duration-300 max-w-[95vw] sm:max-w-3xl"
         style={{ maxHeight: "90vh", overflowY: "auto" }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-600 hover:bg-slate-100 rounded-full"
+          className="absolute top-3 sm:top-4 right-3 sm:right-4 p-2 text-slate-600 hover:bg-slate-100 rounded-full"
           aria-label="Close preview"
         >
           <XMarkIcon className="h-5 w-5" />
         </button>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-3 sm:mb-4">
           {template?.name || "Preview"}
         </h2>
         <EmailPreviewBox html={html} baseWidth={baseWidth} isVisible={true} />
@@ -207,7 +207,7 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
   return (
     <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(59,130,246,0.08),transparent),radial-gradient(900px_500px_at_80%_-10%,rgba(147,51,234,0.08),transparent)]">
       <header className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-4">
-        <div className="flex items-start sm:items-center justify-between gap-6 flex-col sm:flex-row">
+        <div className="flex items-start sm:items-center justify-between gap-4 sm:gap-6 flex-col sm:flex-row">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-600/10 px-3 py-1">
               <SparklesIcon className="h-4 w-4 text-blue-600" />
@@ -215,17 +215,17 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
                 Signature Templates
               </span>
             </div>
-            <h1 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
+            <h1 className="mt-3 text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
               Choose a template
             </h1>
-            <p className="mt-1 text-slate-600">
+            <p className="mt-1 text-slate-600 text-sm sm:text-base">
               Click any card to start customizing.
             </p>
           </div>
-          <div className="shrink-0 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+          <div className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 sm:px-5 py-2.5 sm:py-3 shadow-sm">
             <div className="flex items-center gap-2">
               <CheckBadgeIcon className="h-5 w-5 text-emerald-600" />
-              <span className="text-sm font-semibold text-slate-700">
+              <span className="text-xs sm:text-sm font-semibold text-slate-700">
                 {filtered.length} templates
               </span>
             </div>
@@ -236,7 +236,7 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
       <div className="sticky top-0 z-30 border-y border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="relative group">
+            <div className="relative group md:flex-1">
               <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 blur transition group-focus-within:opacity-20" />
               <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm">
                 <MagnifyingGlassIcon className="ml-3 h-5 w-5 text-slate-400" />
@@ -244,7 +244,7 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by name, category, or tokens..."
-                  className="w-full min-w-[260px] sm:min-w-[360px] md:min-w-[420px] px-3 py-2.5 text-slate-900 placeholder:text-slate-400 bg-transparent border-0 focus:outline-none"
+                  className="w-full px-3 py-2.5 text-slate-900 placeholder:text-slate-400 bg-transparent border-0 focus:outline-none"
                   aria-label="Search templates"
                 />
                 {search && (
@@ -271,12 +271,11 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
                     <button
                       key={cat}
                       onClick={() => setCategory(cat)}
-                      className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition
-                        ${
-                          category === cat
-                            ? "bg-slate-900 text-white shadow-sm"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
+                      className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                        category === cat
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
                       aria-label={`Filter by ${cat} category`}
                     >
                       {cat}
@@ -311,8 +310,8 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
         <div
           className="
             relative rounded-2xl border border-slate-200 bg-white/60 backdrop-blur
-            p-4 sm:p-5
-            h-[70vh] sm:h-[75vh] lg:h-[78vh]
+            p-3 sm:p-5
+            h-auto max-h-[78vh] sm:h-[75vh] lg:h-[78vh]
             overflow-y-auto
             scroll-smooth
             scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent
@@ -330,7 +329,12 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
               </div>
             </div>
           ) : filtered.length > 0 ? (
-            <div className="grid grid-cols-3 gap-6">
+            <div
+              className="
+                grid gap-4 sm:gap-5 lg:gap-6
+                grid-cols-1 xs:grid-cols-2 md:grid-cols-3 2xl:grid-cols-4
+              "
+            >
               {filtered.map((t) => {
                 const html = cleanSignatureHtml(
                   renderWithPlaceholders(t.html || "", t.placeholders, t.tokens)
@@ -350,16 +354,16 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
                     aria-label={`Select template: ${t.name || "Untitled"}`}
                   >
                     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
-                    <div className="p-5 bg-slate-50">
+                    <div className="p-3 sm:p-5 bg-slate-50">
                       <EmailPreviewBox
                         html={html}
                         baseWidth={baseWidth}
                         isVisible={visibility[t.id]}
                       />
                     </div>
-                    <div className="p-5">
+                    <div className="p-4 sm:p-5">
                       <div className="mb-3 flex items-center gap-3">
-                        <h3 className="flex-1 truncate text-base font-extrabold text-slate-900">
+                        <h3 className="flex-1 truncate text-sm sm:text-base font-extrabold text-slate-900">
                           {t.name || "Untitled"}
                         </h3>
                         <button
@@ -376,11 +380,11 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-blue-700">
                           <SparklesIcon className="h-4 w-4" />
                           {t.category || "Uncategorized"}
                         </span>
-                        <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                        <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-slate-700">
                           {baseWidth}px
                         </span>
                       </div>
@@ -393,15 +397,15 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
               })}
             </div>
           ) : (
-            <div className="grid h-full place-items-center text-center">
+            <div className="grid h-full place-items-center text-center px-4">
               <div>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
-                  <MagnifyingGlassIcon className="h-8 w-8 text-blue-600" />
+                <div className="mx-auto mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
+                  <MagnifyingGlassIcon className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-black text-slate-900">
+                <h3 className="text-lg sm:text-xl font-black text-slate-900">
                   Nothing matches your filters
                 </h3>
-                <p className="mt-1 text-slate-600">
+                <p className="mt-1 text-slate-600 text-sm sm:text-base">
                   {debouncedSearch
                     ? `No templates match “${debouncedSearch}”. Try different keywords or reset filters.`
                     : "Try adjusting categories or clearing filters to see all templates."}
