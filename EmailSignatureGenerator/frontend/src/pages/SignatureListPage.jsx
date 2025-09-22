@@ -1,4 +1,4 @@
-// dont change main code make it resopnsive
+// frontend/src/pages/SignatureListPage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -157,7 +157,7 @@ function PreviewModal({ isOpen, onClose, signature }) {
           const result = await copyHtml(cleaned, true);
           finalized = typeof result === "string" ? result : "";
         } catch {
-          finalized = cleaned; // Fallback to cleaned if copyHtml fails
+          finalized = cleaned;
         }
         setPreviewHtml(
           finalized || cleaned || "<div>No content available</div>"
@@ -549,6 +549,8 @@ const SignatureListPage = () => {
                 </span>
               </div>
             </div>
+            {/* HIDE ONLY THIS BUTTON */}
+            {/*
             <button
               onClick={() => navigate("/signatures/create")}
               className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
@@ -557,6 +559,7 @@ const SignatureListPage = () => {
               <PencilIcon className="h-4 w-4" />
               New Signature
             </button>
+            */}
           </div>
         </div>
       </header>

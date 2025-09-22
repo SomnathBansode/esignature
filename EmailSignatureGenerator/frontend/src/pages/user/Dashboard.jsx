@@ -83,12 +83,14 @@ const Dashboard = () => {
 
             {/* Quick actions row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              {/*
               <button
                 onClick={() => navigate("/signatures/create")}
                 className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
               >
                 Create Signature
               </button>
+              */}
               <button
                 onClick={() => navigate("/signatures")}
                 className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
@@ -139,6 +141,7 @@ const Dashboard = () => {
 
         {/* Action cards (match AdminDashboard style) */}
         <section className="grid gap-6 sm:gap-7 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/*
           <DashboardCard
             onClick={() => navigate("/signatures/create")}
             Icon={FiFilePlus}
@@ -146,6 +149,7 @@ const Dashboard = () => {
             desc="Build a fresh email signature from a template with your details."
             cta="Start Building"
           />
+          */}
           <DashboardCard
             onClick={() => navigate("/signatures")}
             Icon={FiList}
