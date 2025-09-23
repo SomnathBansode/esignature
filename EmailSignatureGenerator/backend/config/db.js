@@ -26,12 +26,12 @@ export const checkConnection = async () => {
       "SELECT current_schema() AS schema, version(), now()"
     );
     console.log(
-      "✅ Database connected:",
+      "Database connected:",
       `schema=${rows[0].schema}, version=${rows[0].version}, time=${rows[0].now}`
     );
     return true;
   } catch (err) {
-    console.error("❌ Database connection failed:", err.message);
+    console.error("Database connection failed:", err.message);
     return false;
   }
 };
@@ -58,12 +58,13 @@ export default pool;
 //     const { rows } = await pool.query(
 //       "SELECT current_schema() AS schema, now()"
 //     );
-//     console.log("✅ Database connected. search_path schema:", rows[0].schema);
+//     console.log("Database connected. search_path schema:", rows[0].schema);
 //     return true;
 //   } catch (err) {
-//     console.error("❌ Database connection failed:", err.message);
+//     console.error("Database connection failed:", err.message);
 //     return false;
 //   }
 // };
 
 // export default pool;
+

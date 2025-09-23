@@ -216,7 +216,10 @@ function PreviewModal({ isOpen, onClose, signature }) {
       return;
     }
     try {
-      const ok = await copyHtml(previewHtml);
+      const ok = await copyHtml(previewHtml, undefined, {
+        inlineImages: false,
+        inlineCss: true,
+      });
       if (ok) toast.success("Copied rich HTML (cleaned)");
       else toast.error("Copy failed. Try a desktop browser.");
     } catch {
@@ -451,7 +454,10 @@ const SignatureListPage = () => {
       return;
     }
     try {
-      const ok = await copyHtml(cleanedById[sig.id]);
+      const ok = await copyHtml(cleanedById[sig.id], undefined, {
+        inlineImages: false,
+        inlineCss: true,
+      });
       if (ok) toast.success("Copied rich HTML (cleaned)");
       else toast.error("Copy failed. Try a desktop browser.");
     } catch {

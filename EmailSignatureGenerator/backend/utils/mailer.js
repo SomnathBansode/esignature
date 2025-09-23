@@ -88,113 +88,6 @@
 //   `;
 // };
 
-// // Send email function with comprehensive error handling and debugging
-// export const sendEmail = async (to, subject, text, htmlOptions) => {
-//   try {
-//     console.log(`📧 Attempting to send email to: ${to}`);
-//     console.log(`📧 Using email account: ${process.env.EMAIL_USER}`);
-//     console.log(`📧 Email subject: ${subject}`);
-
-//     // Validate required environment variables
-//     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-//       throw new Error(
-//         "Email credentials not configured. Check EMAIL_USER and EMAIL_PASS environment variables."
-//       );
-//     }
-
-//     // Validate recipient email
-//     if (!to || !to.includes("@")) {
-//       throw new Error(`Invalid recipient email: ${to}`);
-//     }
-
-//     const html = generateEmailTemplate({ ...htmlOptions, email: to });
-
-//     const mailOptions = {
-//       from: `"Email Signature Generator" <${process.env.EMAIL_USER}>`,
-//       to,
-//       subject,
-//       text,
-//       html,
-//       headers: {
-//         "X-PM-Message-Stream": "outbound",
-//         "List-Unsubscribe": `<${
-//           process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app"
-//         }/unsubscribe?email=${encodeURIComponent(to)}>`,
-//       },
-//     };
-
-//     console.log("📧 Mail options prepared:", {
-//       from: mailOptions.from,
-//       to: mailOptions.to,
-//       subject: mailOptions.subject,
-//       hasHtml: !!mailOptions.html,
-//       hasText: !!mailOptions.text,
-//     });
-
-//     // Send the email
-//     const result = await transporter.sendMail(mailOptions);
-
-//     console.log(`✅ Email sent successfully to ${to}`);
-//     console.log(`✅ Message ID: ${result.messageId}`);
-//     console.log(`✅ Response: ${result.response}`);
-
-//     return result;
-//   } catch (error) {
-//     console.error("❌ Error sending email:", error);
-//     console.error("❌ Error details:", {
-//       message: error.message,
-//       code: error.code,
-//       command: error.command,
-//       stack: error.stack,
-//     });
-
-//     // Check for specific common errors
-//     if (error.code === "EAUTH") {
-//       console.error("❌ Authentication failed. Check your email credentials.");
-//     } else if (error.code === "ECONNECTION") {
-//       console.error("❌ Connection failed. Check your internet connection.");
-//     } else if (error.code === "EENVELOPE") {
-//       console.error("❌ Invalid envelope. Check recipient email address.");
-//     }
-
-//     throw new Error(`Email sending failed: ${error.message}`);
-//   }
-// };
-
-// // Test email function for debugging
-// export const testEmail = async () => {
-//   try {
-//     console.log("🧪 Testing email configuration...");
-
-//     const testEmail = process.env.EMAIL_USER; // Send test to yourself
-
-//     const result = await sendEmail(
-//       testEmail,
-//       "Test Email - Email Signature Generator",
-//       "This is a test email to verify your email configuration is working correctly.",
-//       {
-//         title: "Test Email",
-//         greeting: "Hello!",
-//         message:
-//           "This is a test email to verify your email configuration is working correctly.",
-//         ctaText: "Visit Website",
-//         ctaLink:
-//           process.env.CLIENT_ORIGIN || "https://your-netlify-site.netlify.app",
-//         footerText: "Test email from Email Signature Generator",
-//       }
-//     );
-
-//     console.log("✅ Test email sent successfully!");
-//     return result;
-//   } catch (error) {
-//     console.error("❌ Test email failed:", error);
-//     throw error;
-//   }
-// };
-
-// // Export transporter for direct access if needed
-// export { transporter };
-
 import nodemailer from "nodemailer";
 import sendgridTransport from "nodemailer-sendgrid";
 
@@ -287,9 +180,9 @@ const generateEmailTemplate = ({
 // Send email function with comprehensive error handling and debugging
 export const sendEmail = async (to, subject, text, htmlOptions) => {
   try {
-    console.log(`📧 Attempting to send email to: ${to}`);
-    console.log(`📧 Using email account: ${process.env.EMAIL_USER}`);
-    console.log(`📧 Email subject: ${subject}`);
+    console.log(`Attempting to send email to: ${to}`);
+    console.log(`Using email account: ${process.env.EMAIL_USER}`);
+    console.log(`Email subject: ${subject}`);
 
     // Validate required environment variables
     if (!process.env.SENDGRID_API_KEY) {
@@ -321,7 +214,7 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
       },
     };
 
-    console.log("📧 Mail options prepared:", {
+    console.log("Mail options prepared:", {
       from: mailOptions.from,
       to: mailOptions.to,
       subject: mailOptions.subject,
@@ -332,18 +225,18 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
     // Send the email
     const result = await transporter.sendMail(mailOptions);
 
-    console.log(`✅ Email sent successfully to ${to}`);
-    console.log(`✅ Raw result:`, result); // Log full result for debugging
+    console.log(`Email sent successfully to ${to}`);
+    console.log(`Raw result:`, result); // Log full result for debugging
     console.log(
-      `✅ Message ID:`,
+      `Message ID:`,
       result.messageId || "Not provided by SendGrid"
     );
-    console.log(`✅ Response:`, result.response || "Not provided by SendGrid");
+    console.log(`Response:`, result.response || "Not provided by SendGrid");
 
     return result;
   } catch (error) {
-    console.error("❌ Error sending email:", error);
-    console.error("❌ Error details:", {
+    console.error("Error sending email:", error);
+    console.error("Error details:", {
       message: error.message,
       code: error.code,
       command: error.command,
@@ -354,15 +247,15 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
 
     // Check for specific common errors
     if (error.responseCode === 401) {
-      console.error("❌ Authentication failed. Check your SendGrid API key.");
+      console.error("Authentication failed. Check your SendGrid API key.");
     } else if (error.responseCode === 403) {
       console.error(
-        "❌ Forbidden. Check if sender email is verified in SendGrid."
+        "Forbidden. Check if sender email is verified in SendGrid."
       );
     } else if (error.code === "ECONNECTION") {
-      console.error("❌ Connection failed. Check SendGrid API status.");
+      console.error("Connection failed. Check SendGrid API status.");
     } else if (error.code === "EENVELOPE") {
-      console.error("❌ Invalid envelope. Check recipient email address.");
+      console.error("Invalid envelope. Check recipient email address.");
     }
 
     throw new Error(`Email sending failed: ${error.message}`);
@@ -372,7 +265,7 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
 // Test email function for debugging
 export const testEmail = async () => {
   try {
-    console.log("🧪 Testing email configuration...");
+    console.log("Testing email configuration...");
 
     const testEmail = process.env.EMAIL_USER || "test@example.com";
 
@@ -393,13 +286,14 @@ export const testEmail = async () => {
       }
     );
 
-    console.log("✅ Test email sent successfully!");
+    console.log("Test email sent successfully!");
     return result;
   } catch (error) {
-    console.error("❌ Test email failed:", error);
+    console.error("Test email failed:", error);
     throw error;
   }
 };
 
 // Export transporter for direct access if needed
 export { transporter };
+

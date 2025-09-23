@@ -553,8 +553,12 @@ const AdminTemplateBuilder = () => {
             <button
               onClick={async () => {
                 try {
-                  await navigator.clipboard.writeText(htmlContent);
-                  toast.success("HTML copied");
+                  const ok = await copyHtml(htmlContent, undefined, {
+                    inlineImages: false,
+                    inlineCss: true,
+                  });
+                  if (ok) toast.success("Copied HTML (mobile-safe)");
+                  else toast.error("Copy failed. Try desktop browser.");
                 } catch {
                   toast.error("Copy failed");
                 }

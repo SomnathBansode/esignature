@@ -41,7 +41,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      console.log(`🔎 Request origin: ${origin}`);
+      console.log('Request origin: ' + origin);
       if (!origin || allowedOrigins.includes(origin)) callback(null, true);
       else callback(new Error("Not allowed by CORS"));
     },
@@ -55,7 +55,7 @@ app.get("/test-email", async (_req, res) => {
     await testEmail();
     res.json({ message: "Test email sent successfully" });
   } catch (error) {
-    console.error("❌ Test email failed:", error);
+    console.error("Test email failed:", error);
     res.status(500).json({ error: `Test email failed: ${error.message}` });
   }
 });
@@ -83,7 +83,7 @@ app.use("/api/uploads", uploadsRouter);
 
 // --- Error handler ---
 app.use((err, _req, res, _next) => {
-  console.error("❌ Server error:", err);
+  console.error("Server error:", err);
   res.status(400).json({ error: err.message || "Something went wrong" });
 });
 
@@ -152,3 +152,4 @@ const shutdown = async () => {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
