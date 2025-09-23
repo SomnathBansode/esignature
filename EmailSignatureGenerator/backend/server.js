@@ -84,7 +84,8 @@ app.use("/api/uploads", uploadsRouter);
 // --- Error handler ---
 app.use((err, _req, res, _next) => {
   console.error("Server error:", err);
-  res.status(400).json({ error: err.message || "Something went wrong" });
+  const status = err?.statusCode || err?.status || 500;
+  res.status(status).json({ error: err?.message || "Something went wrong" });
 });
 
 // --- Debug database route ---
@@ -152,4 +153,3 @@ const shutdown = async () => {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-
