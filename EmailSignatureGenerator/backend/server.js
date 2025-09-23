@@ -41,7 +41,6 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      console.log('Request origin: ' + origin);
       if (!origin || allowedOrigins.includes(origin)) callback(null, true);
       else callback(new Error("Not allowed by CORS"));
     },
@@ -117,23 +116,9 @@ app.get("/debug/db", async (_req, res) => {
 const PORT = process.env.PORT || 5050;
 const server = app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log("Env check:", {
-    DATABASE_URL: process.env.DATABASE_URL ? "Set" : "Missing",
-    CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || "Missing",
-    PORT: process.env.PORT || "Missing",
-    JWT_SECRET: process.env.JWT_SECRET ? "Set" : "Missing",
-    EMAIL_USER: process.env.EMAIL_USER || "Missing",
-    EMAIL_PASS: process.env.EMAIL_PASS ? "Set" : "Missing",
-    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "Missing",
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || "Missing",
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET
-      ? "Set"
-      : "Missing",
-    CLOUDINARY_SIGN_ALGORITHM: process.env.CLOUDINARY_SIGN_ALGORITHM || "sha1",
-  });
   try {
     const dbOk = await checkConnection();
-    console.log(`Database connected: ${dbOk}`);
+    if (!dbOk) console.error("Database connectivity check failed");
   } catch (err) {
     console.error("DB connection failed at startup:", err);
   }

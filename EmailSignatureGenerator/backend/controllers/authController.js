@@ -11,7 +11,7 @@ const now = () => (typeof performance !== "undefined" ? performance.now() : Date
 export const register = async (req, res, next) => {
   const { name, email, password, role } = req.body;
   const t0 = now();
-  console.log(`Register request: email=${email}, origin=${req.headers.origin}`);
+  // removed verbose request log
   try {
     const tDb0 = now();
     const { rows } = await query(
@@ -68,10 +68,7 @@ export const register = async (req, res, next) => {
       ).catch((err) => console.error(`Welcome email failed for ${user.email}:`, err))
     );
 
-    console.log(
-      "auth.register timings (ms):",
-      { dbCheckMs, hashMs, dbCreateMs, jwtMs, totalMs: Math.round(now() - t0) }
-    );
+    // removed timing logs
     return;
   } catch (error) {
     console.error(`Error in register for ${email}:`, error);
@@ -83,7 +80,7 @@ export const register = async (req, res, next) => {
 export const login = async (req, res, next) => {
   const { email, password } = req.body;
   const t0 = now();
-  console.log(`Login request: email=${email}, origin=${req.headers.origin}`);
+  // removed verbose request log
   try {
     const tDb0 = now();
     const { rows } = await query(
@@ -118,10 +115,7 @@ export const login = async (req, res, next) => {
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       token,
     };
-    console.log(
-      "auth.login timings (ms):",
-      { dbMs, bcryptMs, jwtMs, dbUpdateMs, totalMs: Math.round(now() - t0) }
-    );
+    // removed timing logs
     return res.json(payload);
   } catch (error) {
     console.error(`Error in login for ${email}:`, error);
@@ -133,7 +127,7 @@ export const login = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
   const { email } = req.body;
   const t0 = now();
-  console.log(`Forgot password request: email=${email}, origin=${req.headers.origin}`);
+  // removed verbose request log
   try {
     const tDb0 = now();
     const { rows } = await query(
@@ -186,10 +180,7 @@ export const forgotPassword = async (req, res, next) => {
       ).catch((err) => console.error(`Reset email failed for ${user.email}:`, err))
     );
 
-    console.log(
-      "auth.forgotPassword timings (ms):",
-      { dbLookupMs, dbUpdateMs, totalMs: Math.round(now() - t0) }
-    );
+    // removed timing logs
     return;
   } catch (error) {
     console.error(`Error in forgotPassword for ${email}:`, error);
@@ -201,7 +192,7 @@ export const forgotPassword = async (req, res, next) => {
 export const resetPassword = async (req, res, next) => {
   const { token, newPassword } = req.body;
   const t0 = now();
-  console.log(`Reset password request: token=${token}, origin=${req.headers.origin}`);
+  // removed verbose request log
   try {
     const tDb0 = now();
     const { rows } = await query(
@@ -251,10 +242,7 @@ export const resetPassword = async (req, res, next) => {
       ).catch((err) => console.error(`Reset success email failed for ${user.email}:`, err))
     );
 
-    console.log(
-      "auth.resetPassword timings (ms):",
-      { dbLookupMs, hashMs, dbUpdateMs, totalMs: Math.round(now() - t0) }
-    );
+    // removed timing logs
     return;
   } catch (error) {
     console.error(`Error in resetPassword:`, error);

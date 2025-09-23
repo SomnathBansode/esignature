@@ -15,17 +15,12 @@ router.post("/cloudinary-signature", protect, (req, res) => {
 
     // Sign EXACTLY the params you'll send to Cloudinary
     const paramsToSign = { folder, timestamp };
-    console.log("Signing params:", paramsToSign);
-    console.log(
-      "API Secret (first 4 chars):",
-      process.env.CLOUDINARY_API_SECRET?.slice(0, 4)
-    );
 
     const signature = cloudinary.utils.api_sign_request(
       paramsToSign,
       process.env.CLOUDINARY_API_SECRET
     );
-    console.log("Generated signature:", signature);
+    // quiet generated signature logging
 
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
       throw new Error("Cloudinary configuration missing");

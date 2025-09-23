@@ -67,14 +67,7 @@ export const getTemplates = async (req, res, next) => {
     // ordering only; response shape unchanged
     queryText += " ORDER BY created_at DESC";
     const { rows } = await query(queryText, params);
-    console.log(
-      "getTemplates: Fetched templates:",
-      rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        placeholders: r.placeholders,
-      }))
-    );
+    // removed verbose list log
     res.json(rows);
   } catch (e) {
     console.error("getTemplates: Error:", e);
@@ -95,11 +88,7 @@ export const getTemplateById = async (req, res, next) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: "Template not found" });
     }
-    console.log("getTemplateById: Fetched template:", {
-      id: rows[0].id,
-      name: rows[0].name,
-      placeholders: rows[0].placeholders,
-    });
+    // removed verbose fetch log
     res.json(rows[0]);
   } catch (error) {
     console.error("getTemplateById: Error:", error);
@@ -136,15 +125,7 @@ export const addTemplate = async (req, res, next) => {
         .json({ error: `Invalid HTML content: ${htmlError}` });
     }
 
-    console.log("addTemplate: Received payload:", {
-      name,
-      thumbnail,
-      tokens,
-      html,
-      placeholders,
-      category,
-      created_by: req.user.id,
-    });
+    // removed verbose payload log
 
     const tokensJson = JSON.stringify(tokens || {});
     const placeholdersJson = JSON.stringify(placeholders || []);
@@ -171,11 +152,7 @@ export const addTemplate = async (req, res, next) => {
       ["TEMPLATE_ADD", auditJson]
     );
 
-    console.log("addTemplate: Saved template:", {
-      id: rows[0].id,
-      name: rows[0].name,
-      placeholders: rows[0].placeholders,
-    });
+    // removed verbose success log
     res.json(rows[0]);
   } catch (e) {
     console.error("addTemplate: Error:", e);
@@ -213,15 +190,7 @@ export const updateTemplate = async (req, res, next) => {
         .json({ error: `Invalid HTML content: ${htmlError}` });
     }
 
-    console.log("updateTemplate: Received payload:", {
-      id,
-      name,
-      thumbnail,
-      tokens,
-      html,
-      placeholders,
-      category,
-    });
+    // removed verbose payload log
 
     const tokensJson = JSON.stringify(tokens || {});
     const placeholdersJson = JSON.stringify(placeholders || []);
@@ -253,11 +222,7 @@ export const updateTemplate = async (req, res, next) => {
       ["TEMPLATE_UPDATE", auditJson]
     );
 
-    console.log("updateTemplate: Updated template:", {
-      id: rows[0].id,
-      name: rows[0].name,
-      placeholders: rows[0].placeholders,
-    });
+    // removed verbose success log
     res.json(rows[0]);
   } catch (e) {
     console.error("updateTemplate: Error:", e);
@@ -293,7 +258,7 @@ export const deleteTemplate = async (req, res, next) => {
       ["TEMPLATE_DELETE", auditJson]
     );
 
-    console.log("deleteTemplate: Template deleted:", id);
+    // removed verbose delete log
     res.json({ message: "Template deleted successfully" });
   } catch (e) {
     console.error("deleteTemplate: Error:", e);

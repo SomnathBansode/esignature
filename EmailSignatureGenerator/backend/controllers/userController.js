@@ -15,9 +15,7 @@ export const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { is_active } = req.body;
-    console.log(
-      `Updating user ${id} with is_active=${is_active}, admin_id=${req.user?.id}`
-    );
+    // removed verbose admin update log
     if (!id) {
       throw new Error("User ID is missing in request parameters");
     }
@@ -36,23 +34,21 @@ export const updateUser = async (req, res, next) => {
     }
 
     if (!is_active) {
-      console.log(`Attempting to blacklist token for user ${id}`);
+      // removed verbose blacklist attempt log
       try {
         const { rows: user } = await query(
           "SELECT current_token FROM signature_app.users WHERE id = $1",
           [id]
         );
-        console.log(`User token data for ${id}:`, user);
+        // removed verbose token data log
         if (user.length > 0 && user[0].current_token) {
           const { rows: blacklisted } = await query(
             "INSERT INTO signature_app.token_blacklist (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '1 hour') RETURNING *",
             [user[0].current_token, id]
           );
-          console.log(`Blacklisted rows for user ${id}:`, blacklisted);
+          // removed verbose blacklist rows log
         } else {
-          console.log(
-            `No current_token found for user ${id}, skipping blacklist`
-          );
+          // removed verbose no-token log
         }
       } catch (blacklistError) {
         console.error(
@@ -75,7 +71,7 @@ export const updateUser = async (req, res, next) => {
 export const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    console.log(`Deleting user ${id}, admin_id=${req.user?.id}`);
+    // removed verbose delete log
     if (!id) {
       throw new Error("User ID is missing in request parameters");
     }
@@ -105,7 +101,6 @@ export const deleteUser = async (req, res, next) => {
 export const logAdminModeSwitch = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    console.log(`Logging admin mode switch for user ${userId}`);
     await query("SELECT signature_app.log_admin_mode_switch($1)", [userId]);
     res.json({ message: "Admin mode switch logged" });
   } catch (e) {

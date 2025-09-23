@@ -99,12 +99,9 @@ const transporter = nodemailer.createTransport(
 );
 
 // Verify transporter connection on startup
-transporter.verify(function (error, success) {
+transporter.verify(function (error) {
   if (error) {
     console.error("SendGrid transporter verification failed:", error);
-  } else {
-    console.log("SendGrid transporter is ready to send messages");
-    console.log("Using email account:", process.env.EMAIL_USER);
   }
 });
 
@@ -180,9 +177,7 @@ const generateEmailTemplate = ({
 // Send email function with comprehensive error handling and debugging
 export const sendEmail = async (to, subject, text, htmlOptions) => {
   try {
-    console.log(`Attempting to send email to: ${to}`);
-    console.log(`Using email account: ${process.env.EMAIL_USER}`);
-    console.log(`Email subject: ${subject}`);
+    // quiet success logs; keep errors only
 
     // Validate required environment variables
     if (!process.env.SENDGRID_API_KEY) {
@@ -214,24 +209,12 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
       },
     };
 
-    console.log("Mail options prepared:", {
-      from: mailOptions.from,
-      to: mailOptions.to,
-      subject: mailOptions.subject,
-      hasHtml: !!mailOptions.html,
-      hasText: !!mailOptions.text,
-    });
+    // omit verbose mail options logging
 
     // Send the email
     const result = await transporter.sendMail(mailOptions);
 
-    console.log(`Email sent successfully to ${to}`);
-    console.log(`Raw result:`, result); // Log full result for debugging
-    console.log(
-      `Message ID:`,
-      result.messageId || "Not provided by SendGrid"
-    );
-    console.log(`Response:`, result.response || "Not provided by SendGrid");
+    // omit success output; return result to caller
 
     return result;
   } catch (error) {
@@ -265,7 +248,7 @@ export const sendEmail = async (to, subject, text, htmlOptions) => {
 // Test email function for debugging
 export const testEmail = async () => {
   try {
-    console.log("Testing email configuration...");
+    // quiet test logs
 
     const testEmail = process.env.EMAIL_USER || "test@example.com";
 
@@ -286,7 +269,7 @@ export const testEmail = async () => {
       }
     );
 
-    console.log("Test email sent successfully!");
+    // quiet success
     return result;
   } catch (error) {
     console.error("Test email failed:", error);
@@ -296,4 +279,3 @@ export const testEmail = async () => {
 
 // Export transporter for direct access if needed
 export { transporter };
-

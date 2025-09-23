@@ -30,10 +30,6 @@ export const checkConnection = async () => {
     const { rows } = await pool.query(
       "SELECT current_schema() AS schema, version(), now()"
     );
-    console.log(
-      "Database connected:",
-      `schema=${rows[0].schema}, version=${rows[0].version}, time=${rows[0].now}`
-    );
     return true;
   } catch (err) {
     console.error("Database connection failed:", err.message);
