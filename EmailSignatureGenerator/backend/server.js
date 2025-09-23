@@ -4,18 +4,20 @@ import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import templateRoutes from "./routes/templateRoutes.js";
 import signatureRoutes from "./routes/signatureRoutes.js";
-import { checkConnection } from "./config/db.js";
-import pool from "./config/db.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import proxyRoutes from "./routes/proxy.js";
-import { testEmail } from "./utils/mailer.js";
 import uploadsRouter from "./routes/uploadRoutes.js";
+import { checkConnection } from "./config/db.js";
+import pool from "./config/db.js";
+import { testEmail } from "./utils/mailer.js";
 
 const app = express();
+
+// --- JSON parser ---
 app.use(express.json({ limit: "2mb" }));
 
-// Validate critical environment variables
+// --- Validate critical environment variables ---
 const requiredEnvVars = [
   "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY",
@@ -36,48 +38,41 @@ const allowedOrigins = [
   process.env.CLIENT_ORIGIN || "https://esignaturewebapp.netlify.app",
   "http://localhost:5173",
 ];
-
 app.use(
   cors({
     origin: (origin, callback) => {
       console.log(`🔎 Request origin: ${origin}`);
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+      else callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
 );
 
-// Test email route (debug)
-app.get("/test-email", async (req, res) => {
-  console.log(`🚀 Test email request, origin=${req.headers.origin}`);
+// --- Test email route ---
+app.get("/test-email", async (_req, res) => {
   try {
     await testEmail();
     res.json({ message: "Test email sent successfully" });
   } catch (error) {
-    console.error(`❌ Test email failed:`, error);
+    console.error("❌ Test email failed:", error);
     res.status(500).json({ error: `Test email failed: ${error.message}` });
   }
 });
 
-// Health checks
+// --- Health check routes ---
 app.get("/health", async (_req, res) => {
   const dbOk = await checkConnection();
   res.json({ status: "ok", db: dbOk ? "connected" : "error" });
 });
-app.get("/live", (_req, res) => {
-  res.status(200).json({ status: "ok" });
-});
+app.get("/live", (_req, res) => res.status(200).json({ status: "ok" }));
 app.get("/ready", async (_req, res) => {
   const ok = await checkConnection();
   if (ok) return res.status(200).json({ db: "connected" });
   return res.status(503).json({ db: "error" });
 });
 
-// API routes
+// --- API routes ---
 app.use("/api/auth", authRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/signatures", signatureRoutes);
@@ -86,13 +81,13 @@ app.use("/api/users", userRoutes);
 app.use("/api/proxy", proxyRoutes);
 app.use("/api/uploads", uploadsRouter);
 
-// Basic error handler
+// --- Error handler ---
 app.use((err, _req, res, _next) => {
-  console.error(`❌ Server error:`, err);
+  console.error("❌ Server error:", err);
   res.status(400).json({ error: err.message || "Something went wrong" });
 });
 
-// Debug database route
+// --- Debug database route ---
 app.get("/debug/db", async (_req, res) => {
   const start = process.hrtime.bigint();
   const poolStats = {
@@ -100,18 +95,12 @@ app.get("/debug/db", async (_req, res) => {
     idle: pool.idleCount,
     waiting: pool.waitingCount,
   };
-
   try {
     const { rows } = await pool.query(
-      "select now() as now, version(), current_user, current_database()"
+      "SELECT now() AS now, version(), current_user, current_database()"
     );
     const latencyMs = Number((process.hrtime.bigint() - start) / 1_000_000n);
-    res.json({
-      ok: true,
-      latency_ms: latencyMs,
-      pool: poolStats,
-      db: rows[0],
-    });
+    res.json({ ok: true, latency_ms: latencyMs, pool: poolStats, db: rows[0] });
   } catch (err) {
     const latencyMs = Number((process.hrtime.bigint() - start) / 1_000_000n);
     res.status(500).json({
@@ -123,9 +112,9 @@ app.get("/debug/db", async (_req, res) => {
   }
 });
 
-// Graceful shutdown
-const server = app.listen(process.env.PORT || 5050, async () => {
-  const PORT = process.env.PORT || 5050;
+// --- Start server ---
+const PORT = process.env.PORT || 5050;
+const server = app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log("Env check:", {
     DATABASE_URL: process.env.DATABASE_URL ? "Set" : "Missing",
@@ -141,17 +130,25 @@ const server = app.listen(process.env.PORT || 5050, async () => {
       : "Missing",
     CLOUDINARY_SIGN_ALGORITHM: process.env.CLOUDINARY_SIGN_ALGORITHM || "sha1",
   });
-  await checkConnection();
+  try {
+    const dbOk = await checkConnection();
+    console.log(`Database connected: ${dbOk}`);
+  } catch (err) {
+    console.error("DB connection failed at startup:", err);
+  }
 });
 
+// --- Graceful shutdown ---
 const shutdown = async () => {
   console.log("\nShutting down...");
   try {
     await pool.end();
     server.close(() => process.exit(0));
-  } catch {
+  } catch (err) {
+    console.error("Error during shutdown:", err);
     process.exit(1);
   }
 };
+
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
