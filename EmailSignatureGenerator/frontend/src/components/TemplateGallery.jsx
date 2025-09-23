@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -126,6 +127,8 @@ function PreviewModal({ isOpen, onClose, template }) {
 
 const TemplateGallery = ({ templates = [], loading = false }) => {
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.user);
+  const isAuthenticated = Boolean(user);
 
   const categories = useMemo(() => {
     const set = new Set(templates.map((t) => t.category || "Uncategorized"));
@@ -167,14 +170,18 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
     });
   }, [templates, category, debouncedSearch]);
 
-  const go = (id) => navigate(`/signatures/create?templateId=${id}`);
-  const onCardKeyDown = (e, id) => {
+  const go = (template) => {
+    const target = isAuthenticated
+      ? `/signatures/create?templateId=${template.id}`
+      : `/templates/create?templateId=${template.id}`;
+    navigate(target);
+  };
+  const onCardKeyDown = (e, template) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      go(id);
+      go(template);
     }
   };
-
   const cardVisibility = useMemo(() => {
     return templates.reduce((acc, t) => ({ ...acc, [t.id]: false }), {});
   }, [templates]);
@@ -348,8 +355,8 @@ const TemplateGallery = ({ templates = [], loading = false }) => {
                     id={`template-card-${t.id}`}
                     role="gridcell"
                     tabIndex={0}
-                    onClick={() => go(t.id)}
-                    onKeyDown={(e) => onCardKeyDown(e, t.id)}
+                    onClick={() => go(t)}
+                    onKeyDown={(e) => onCardKeyDown(e, t)}
                     className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 animate-fade-in"
                     aria-label={`Select template: ${t.name || "Untitled"}`}
                   >

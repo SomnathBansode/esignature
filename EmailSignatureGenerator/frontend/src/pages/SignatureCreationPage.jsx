@@ -55,10 +55,11 @@ const BROKEN_PLACEHOLDER =
     </svg>`
   );
 
-const SignatureCreationPage = () => {
+const SignatureCreationPage = ({ allowSave = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token } = useSelector((state) => state.user);
+  const canSaveSignature = allowSave && Boolean(user);
 
   const {
     register,
@@ -208,19 +209,21 @@ const SignatureCreationPage = () => {
   }, [template, SOCIAL_FIELDS]);
 
   useEffect(() => {
-    if (!user) {
+    if (allowSave && !user) {
       navigate("/login");
       return;
     }
+
     const fetchTemplate = async () => {
       if (!templateId) return;
       try {
         setLoading(true);
+        const config = token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : {};
         const { data } = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/templates/${templateId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          config
         );
 
         setTemplate(data);
@@ -248,6 +251,7 @@ const SignatureCreationPage = () => {
     };
     fetchTemplate();
   }, [
+    allowSave,
     user,
     navigate,
     templateId,
@@ -338,6 +342,10 @@ const SignatureCreationPage = () => {
 
   const onSubmit = async (data) => {
     if (!template) return;
+    if (!canSaveSignature) {
+      toast.error("Sign in to save this signature. Copy or download instead.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -677,7 +685,7 @@ const SignatureCreationPage = () => {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit(onSubmit)}>
+              <form onSubmit={canSaveSignature ? handleSubmit(onSubmit) : (e) => e.preventDefault()}>
                 {!isPreviewStep ? (
                   <div className="space-y-4">
                     {currentStepData.fields.map((f) => renderField(f))}
@@ -700,6 +708,11 @@ const SignatureCreationPage = () => {
                       </button>
                     </div>
 
+                    {!canSaveSignature && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                        Sign in to save this signature to your account. Copy or download it right away without saving.
+                      </div>
+                    )}
                     {/* HTML Editor Toggle */}
                     <div>
                       <button
@@ -733,20 +746,22 @@ const SignatureCreationPage = () => {
                       )}
                     </div>
 
-                    <button
-                      type="submit"
-                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <>
-                          <ClipLoader size={18} color="#fff" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Signature"
-                      )}
-                    </button>
+                    {canSaveSignature && (
+                      <button
+                        type="submit"
+                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <>
+                            <ClipLoader size={18} color="#fff" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Signature"
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
 

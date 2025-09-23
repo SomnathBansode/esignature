@@ -274,6 +274,10 @@ function App() {
           }
         />
         <Route path="/unsubscribe" element={<UnsubscribePage />} />
+        <Route
+          path="/templates/create"
+          element={<SignatureCreationPage allowSave={false} />}
+        />
         <Route path="/templates" element={<TemplateListPage />} />
         <Route
           path="/signatures/edit/:id"

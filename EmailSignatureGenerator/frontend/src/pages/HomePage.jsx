@@ -93,21 +93,29 @@ const HomePage = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               {user ? (
-                <button
-                  onClick={() =>
-                    navigate(
-                      user.role === "admin" && isAdminMode
-                        ? "/admin/dashboard"
-                        : "/dashboard",
-                      { replace: true }
-                    )
-                  }
-                  className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
-                >
-                  <FiTrendingUp className="w-5 h-5" />
-                  Go to Dashboard
-                  <FiArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
+                <>
+                  <button
+                    onClick={() =>
+                      navigate(
+                        user.role === "admin" && isAdminMode
+                          ? "/admin/dashboard"
+                          : "/dashboard",
+                        { replace: true }
+                      )
+                    }
+                    className="group inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    <FiTrendingUp className="w-5 h-5" />
+                    Go to Dashboard
+                    <FiArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  <button
+                    onClick={() => navigate("/templates", { replace: true })}
+                    className="inline-flex items-center gap-2 bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 transition-all duration-200"
+                  >
+                    Browse Templates
+                  </button>
+                </>
               ) : (
                 <>
                   <button
@@ -122,6 +130,12 @@ const HomePage = () => {
                     className="inline-flex items-center gap-2 bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 transition-all duration-200"
                   >
                     Sign In
+                  </button>
+                  <button
+                    onClick={() => navigate("/templates", { replace: true })}
+                    className="inline-flex items-center gap-2 bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 transition-all duration-200"
+                  >
+                    Browse Templates
                   </button>
                 </>
               )}
