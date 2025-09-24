@@ -71,6 +71,18 @@ app.get("/ready", async (_req, res) => {
   return res.status(503).json({ db: "error" });
 });
 
+// --- Root route ---
+app.get("/", (_req, res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  res.status(200).json({
+    status: "ok",
+    service: "Email Signature API",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // --- API routes ---
 app.use("/api/auth", authRoutes);
 app.use("/api/templates", templateRoutes);
@@ -121,6 +133,68 @@ const server = app.listen(PORT, async () => {
     if (!dbOk) console.error("Database connectivity check failed");
   } catch (err) {
     console.error("DB connection failed at startup:", err);
+  }
+
+  // --- Keepalive pinger (no custom .env) ---
+  try {
+    // Prefer Render-provided URL; fallback to localhost
+    const baseUrl = (process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
+
+    // Fixed jitter between 13–15 minutes (no env required)
+    const minMinutes = 13;
+    const maxMinutes = 15;
+
+    const ping = async () => {
+      const target = `${baseUrl}/?ping=${Date.now()}`; // root route, cache-busting query
+      try {
+        if (typeof fetch === "function") {
+          const res = await fetch(target, {
+            method: "GET",
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+              Pragma: "no-cache",
+              "User-Agent": "keepalive/1.0",
+            },
+          });
+          if (!res.ok) throw new Error(`status ${res.status}`);
+        } else {
+          const https = await import("node:https");
+          await new Promise((resolve, reject) => {
+            const req = https.get(target, (res) => {
+              const ok = (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300;
+              if (!ok) reject(new Error(`status ${res.statusCode}`));
+              else resolve();
+              res.resume();
+            });
+            req.on("error", reject);
+          });
+        }
+      } catch (e) {
+        console.warn("Keepalive ping failed:", e.message);
+      }
+    };
+
+    // helper to pick a random delay between min and max (minutes)
+    const nextDelayMs = () => {
+      const minMs = minMinutes * 60 * 1000;
+      const maxMs = maxMinutes * 60 * 1000;
+      return Math.floor(minMs + Math.random() * (maxMs - minMs));
+    };
+
+    // initial ping (non-blocking), then jittered schedule using setTimeout
+    ping();
+    (function scheduleNext() {
+      setTimeout(async () => {
+        await ping();
+        scheduleNext();
+      }, nextDelayMs());
+    })();
+    console.log(
+      `Keepalive enabled: pinging ${baseUrl}/ at random intervals between ${minMinutes}-${maxMinutes} minutes`
+    );
+  } catch (e) {
+    console.warn("Keepalive setup skipped:", e.message);
   }
 });
 
